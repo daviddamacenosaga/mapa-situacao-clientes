@@ -236,6 +236,15 @@
   .downloadBtn svg{ width:14px; height:14px; flex:none; }
   .downloadStatus{ font-size:12px; color:var(--muted); margin-left:2px; }
 
+  th.chkCol, td.chkCol{ width:32px; text-align:center; }
+  th.chkCol input, td.chkCol input{ cursor:pointer; }
+  td.actionCol{ text-align:right; white-space:nowrap; }
+  .rowCopyBtn{
+    font:600 11.5px "IBM Plex Sans", sans-serif; color:var(--accent); background:var(--accent-soft);
+    border:1px solid transparent; border-radius:6px; padding:4px 10px; cursor:pointer; white-space:nowrap;
+  }
+  .rowCopyBtn:hover{ filter:brightness(0.97); }
+
   .tableCard{ margin-top:12px; background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; }
   .tableScroll{ max-height:440px; overflow-y:auto; overflow-x:auto; }
   table{ width:100%; border-collapse:collapse; font-size:14.5px; }
@@ -269,11 +278,19 @@
   }
   .popupClientRow{ display:flex; align-items:flex-start; gap:7px; }
   .popupClientRow .badge{ flex:none; margin-top:1px; }
-  .popupClientInfo{ display:flex; flex-direction:column; gap:1px; line-height:1.3; min-width:0; }
+  .popupClientInfo{ display:flex; flex-direction:column; gap:1px; line-height:1.3; min-width:0; flex:1 1 auto; }
   .popupClientInfo b{ font-weight:600; font-size:12px; word-break:break-word; }
   .popupClientInfo .mono{ font-family:"IBM Plex Mono", monospace; color:var(--muted); font-size:11px; }
   .popupClientExtra{ color:var(--muted); font-size:10.5px; }
   .popupMore{ color:var(--muted); font-size:11px; padding-top:2px; }
+  .popupCopyBtn{
+    flex:none; align-self:center; font:600 10.5px "IBM Plex Sans", sans-serif; color:var(--accent);
+    background:var(--accent-soft); border:1px solid transparent; border-radius:5px; padding:3px 8px; cursor:pointer; white-space:nowrap;
+  }
+  .popupCopyAllBtn{
+    display:inline-flex; align-items:center; gap:5px; font:600 11.5px "IBM Plex Sans", sans-serif; color:var(--accent);
+    background:var(--accent-soft); border:1px solid transparent; border-radius:6px; padding:5px 10px; cursor:pointer; margin-bottom:4px;
+  }
 
   .leaflet-tooltip.cityCountLabel{
     background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:6px;
@@ -505,7 +522,12 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
         <span id="downloadBtnLabel">Baixar .txt</span>
       </button>
+      <button type="button" class="downloadBtn" id="copySelectedBtn" hidden title="Copiar as informações dos clientes marcados, prontas para colar numa conversa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span id="copySelectedBtnLabel">Copiar selecionados</span>
+      </button>
       <span class="downloadStatus" id="downloadStatus"></span>
+      <span class="downloadStatus" id="copyStatus"></span>
     </div>
   </div>
 
@@ -658,6 +680,9 @@
   const downloadBtnLabel = document.getElementById('downloadBtnLabel');
   const exportInfo = document.getElementById('exportInfo');
   const downloadStatus = document.getElementById('downloadStatus');
+  const copySelectedBtn = document.getElementById('copySelectedBtn');
+  const copySelectedBtnLabel = document.getElementById('copySelectedBtnLabel');
+  const copyStatus = document.getElementById('copyStatus');
   const MARKER_CAP_PER_CIRCLE = 1200;
   const ALL_CLIENTS_MARKER_CAP = 4000;
 
@@ -906,6 +931,7 @@
   let filterNoPend = false; // true = remove (esconde) quem tem pendencia financeira
   let activeUFs = new Set(); // estados marcados; vazio = nenhuma restrição de estado
   let ufFilterInvert = false; // false = mostra só os estados marcados; true = mostra todos, exceto os marcados
+  let selectedClientIds = new Set(); // clientes marcados na tabela, para o botão "Copiar selecionados" — não é resetado por filtro/ordenação, só por novo upload/remoção
 
   xlsxFile.addEventListener('change', () => {
     const file = xlsxFile.files && xlsxFile.files[0];
@@ -1014,6 +1040,9 @@
     filterOnlyPend = false;
     filterNoRede = false;
     filterNoPend = false;
+    selectedClientIds = new Set();
+    copySelectedBtn.hidden = false;
+    updateCopySelectedBtn();
 
     removeFileBtn.hidden = false;
     tabBar.hidden = false;
@@ -1052,6 +1081,9 @@
     filterOnlyPend = false;
     filterNoRede = false;
     filterNoPend = false;
+    selectedClientIds = new Set();
+    copySelectedBtn.hidden = true;
+    copyStatus.textContent = '';
     xlsxFile.value = '';
     clientStatusMsg.textContent = '';
     clientStatusMsg.classList.remove('bad');
@@ -1271,11 +1303,111 @@
     return map;
   }
 
+  // --- Copiar informações de cliente(s) para a área de transferência -------------------
+  // Texto pronto pra colar numa conversa de WhatsApp/e-mail com o representante: nome,
+  // CNPJ, cidade, situação, representante, dias sem comprar, pendência (só se ativa) e
+  // telefone (quando existe) — os mesmos dados já mostrados na tabela e nos popups.
+  function clientById(id){
+    return clientRows.find(c => c.id === id);
+  }
+  function clientCopyBlock(c){
+    if (!c) return '';
+    const s = STATUS_BY_KEY[c.statusKey] || STATUS_FALLBACK;
+    const diasN = diasNumber(c.dias);
+    const lines = [`*${c.razao || c.nome || '(sem nome)'}*`];
+    if (c.cnpj) lines.push(`CNPJ: ${c.cnpj}`);
+    if (c.cidade) lines.push(`Cidade: ${c.cidade}${c.uf ? ' - ' + c.uf : ''}`);
+    lines.push(`Situação: ${s.label}`);
+    if (c.vendedor) lines.push(`Representante: ${c.vendedor}`);
+    if (diasN != null) lines.push(`Dias sem comprar: ${diasN.toLocaleString('pt-BR')}`);
+    else if (c.dias) lines.push(`Dias sem comprar: ${c.dias}`);
+    if (isPendenciaAtiva(c.devedores)) lines.push(`Pendência: ${c.devedores}`);
+    if (c.telefone) lines.push(`Telefone: ${c.telefone}`);
+    return lines.join('\n');
+  }
+  function clientsCopyText(clients){
+    if (!clients.length) return '';
+    if (clients.length === 1) return clientCopyBlock(clients[0]);
+    return clients.map((c, i) => `${i + 1}) ${clientCopyBlock(c)}`).join('\n\n');
+  }
+  async function copyText(text){
+    if (!text) return false;
+    try{
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (err) { /* cai no fallback abaixo */ }
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (err){
+      return false;
+    }
+  }
+  function flashButton(btnEl, ok){
+    if (!btnEl) return;
+    if (btnEl.dataset.origLabel === undefined) btnEl.dataset.origLabel = btnEl.textContent;
+    btnEl.textContent = ok ? 'Copiado!' : 'Erro ao copiar';
+    clearTimeout(btnEl.__flashTimer);
+    btnEl.__flashTimer = setTimeout(() => { btnEl.textContent = btnEl.dataset.origLabel; }, 1500);
+  }
+  window.__copyClientById = async function(id, btnEl){
+    const c = clientById(id);
+    const ok = await copyText(clientCopyBlock(c));
+    flashButton(btnEl, ok);
+  };
+  window.__copyClientsByIds = async function(idsCsv, btnEl){
+    const ids = String(idsCsv).split(',').filter(Boolean).map(Number);
+    const clients = ids.map(clientById).filter(Boolean);
+    const ok = await copyText(clientsCopyText(clients));
+    flashButton(btnEl, ok);
+  };
+  window.__toggleClientSelect = function(id, checked){
+    if (checked) selectedClientIds.add(id);
+    else selectedClientIds.delete(id);
+    updateCopySelectedBtn();
+    syncSelectAllChk(lastRenderedRows || []);
+  };
+  function updateCopySelectedBtn(){
+    const n = selectedClientIds.size;
+    copySelectedBtnLabel.textContent = n > 0 ? `Copiar selecionados (${n})` : 'Copiar selecionados';
+  }
+  function syncSelectAllChk(rows){
+    const chk = document.getElementById('selectAllChk');
+    if (!chk) return;
+    const ids = rows.map(r => r.client.id);
+    const selectedShown = ids.filter(id => selectedClientIds.has(id)).length;
+    chk.checked = ids.length > 0 && selectedShown === ids.length;
+    chk.indeterminate = selectedShown > 0 && selectedShown < ids.length;
+  }
+  copySelectedBtn.addEventListener('click', async () => {
+    const clients = Array.from(selectedClientIds).map(clientById).filter(Boolean);
+    if (!clients.length){
+      copyStatus.textContent = 'Marque ao menos um cliente na tabela.';
+      setTimeout(() => copyStatus.textContent = '', 3000);
+      return;
+    }
+    const ok = await copyText(clientsCopyText(clients));
+    copyStatus.textContent = ok ? `${clients.length} cliente(s) copiado(s).` : 'Não foi possível copiar.';
+    setTimeout(() => copyStatus.textContent = '', 3000);
+  });
+
   // Lista clicável de clientes dentro do popup de uma cidade: razão social, CNPJ e a
   // situação de cada um (a mesma cor/etiqueta usada no resto da ferramenta), mais o
   // representante e "dias sem comprar" quando existem — as informações que mais ajudam a
   // identificar e priorizar um cliente específico sem precisar abrir a tabela de baixo.
   // Cidades muito grandes têm a lista cortada, com um aviso apontando pra tabela completa.
+  // Cada cliente tem um botão "Copiar" (texto pronto pra colar numa conversa), e um botão
+  // no topo copia a lista inteira da cidade de uma vez (mesmo além do que aparece aqui).
   const POPUP_CLIENT_CAP = 25;
   function clientListHTML(clients){
     const sorted = clients.slice().sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
@@ -1292,12 +1424,16 @@
             <span class="mono">${c.cnpj || 'CNPJ não informado'}</span>
             ${extras ? `<span class="popupClientExtra">${extras}</span>` : ''}
           </div>
+          <button type="button" class="popupCopyBtn" onclick="__copyClientById(${c.id}, this)">Copiar</button>
         </div>`;
     }).join('');
     const more = clients.length > POPUP_CLIENT_CAP
       ? `<div class="popupMore">+${clients.length - POPUP_CLIENT_CAP} cliente(s) — veja a lista completa na tabela abaixo do mapa</div>`
       : '';
-    return `<div class="popupClientList">${rows}${more}</div>`;
+    const copyAllBtn = clients.length
+      ? `<button type="button" class="popupCopyAllBtn" onclick="__copyClientsByIds('${clients.map(c => c.id).join(',')}', this)">Copiar todos (${clients.length})</button>`
+      : '';
+    return `<div class="popupClientList">${copyAllBtn}${rows}${more}</div>`;
   }
 
   function cityPopupHTML(agg, entry){
@@ -1359,11 +1495,24 @@
 
   function setupResultsTableHead(){
     resultsTableHeadRow.innerHTML = clientsLoaded
-      ? `<th style="width:32px">#</th><th data-key="nome">Cliente</th><th data-key="cnpj">CNPJ</th><th data-key="cidade">Cidade</th><th data-key="situacao">Situação</th><th data-key="vendedor">Representante</th><th data-key="grupo">Grupo/Rede</th><th data-key="pendencia">Pendência</th><th data-key="dias" class="num">Dias sem comprar</th><th data-key="circulo">Círculo</th><th data-key="distancia" class="num">Distância</th>`
+      ? `<th class="chkCol"><input type="checkbox" id="selectAllChk" title="Marcar/desmarcar todos os clientes visíveis"></th><th style="width:32px">#</th><th data-key="nome">Cliente</th><th data-key="cnpj">CNPJ</th><th data-key="cidade">Cidade</th><th data-key="situacao">Situação</th><th data-key="vendedor">Representante</th><th data-key="grupo">Grupo/Rede</th><th data-key="pendencia">Pendência</th><th data-key="dias" class="num">Dias sem comprar</th><th data-key="circulo">Círculo</th><th data-key="distancia" class="num">Distância</th><th class="actionCol">Ação</th>`
       : `<th style="width:32px">#</th><th data-key="municipio">Município</th><th data-key="circulo">Círculo</th><th data-key="distancia" class="num">Distância</th>`;
     sortState = { key: null, dir: 1 };
     updateSortArrows();
   }
+  // Checkbox "marcar todos" no cabeçalho: como o <thead> é recriado (innerHTML) toda vez
+  // que setupResultsTableHead() roda, o listener fica no próprio <tr> do cabeçalho
+  // (delegação), assim continua funcionando mesmo depois de trocar de arquivo.
+  resultsTableHeadRow.addEventListener('change', (e) => {
+    if (e.target.id !== 'selectAllChk') return;
+    const checked = e.target.checked;
+    for (const r of (lastRenderedRows || [])){
+      if (checked) selectedClientIds.add(r.client.id);
+      else selectedClientIds.delete(r.client.id);
+    }
+    updateCopySelectedBtn();
+    renderTable(lastRenderedRows || []);
+  });
 
   // Ordenação clicável em qualquer cabeçalho de coluna da tabela de resultados (dentro dos
   // círculos). Clicar de novo no mesmo cabeçalho inverte a direção; trocar de coluna volta a
@@ -2121,12 +2270,14 @@
       emptyState.textContent = clientsLoaded
         ? 'Crie ao menos um círculo (clique no mapa ou digite uma cidade e aperte Enter) para ver os clientes aqui.'
         : 'Crie ao menos um círculo no mapa para ver os municípios aqui.';
+      if (clientsLoaded) syncSelectAllChk([]);
       return;
     }
     if (!rows.length){
       resultsBody.innerHTML = '';
       emptyState.hidden = false;
       emptyState.textContent = clientsLoaded ? 'Nenhum cliente encontrado com esse filtro.' : 'Nenhum município encontrado com esse filtro.';
+      if (clientsLoaded) syncSelectAllChk([]);
       return;
     }
     emptyState.hidden = true;
@@ -2141,8 +2292,10 @@
           : `<span style="color:var(--muted)">—</span>`;
         const diasN = diasNumber(c.dias);
         const diasCell = diasN != null ? `${diasN.toLocaleString('pt-BR')} dias` : (c.dias || '<span style="color:var(--muted)">—</span>');
+        const checked = selectedClientIds.has(c.id) ? ' checked' : '';
         return `
         <tr onclick="__focusLatLon(${c.lat}, ${c.lon})">
+          <td class="chkCol" onclick="event.stopPropagation()"><input type="checkbox"${checked} onchange="__toggleClientSelect(${c.id}, this.checked)"></td>
           <td class="rank">${i+1}</td>
           <td class="city">${c.nome || ''}</td>
           <td class="mono">${c.cnpj || ''}</td>
@@ -2154,8 +2307,10 @@
           <td class="mono">${diasCell}</td>
           <td class="circleCol"><span class="dot" style="background:${r.bestColor}"></span>${circleTxt}</td>
           <td class="dist">${fmt(r.bestD)} km</td>
+          <td class="actionCol" onclick="event.stopPropagation()"><button type="button" class="rowCopyBtn" onclick="__copyClientById(${c.id}, this)">Copiar</button></td>
         </tr>`;
       }).join('');
+      syncSelectAllChk(rows);
     } else {
       resultsBody.innerHTML = rows.map((r, i) => {
         const circleTxt = r.circleIds.size > 1 ? Array.from(r.circleIds).sort((a,b)=>a-b).join(', ') : String(r.bestCircleId);
