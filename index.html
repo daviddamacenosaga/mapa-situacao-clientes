@@ -188,10 +188,16 @@
     display:flex; flex-direction:column; overflow:auto; padding:16px 20px;
   }
   .mapCard.expanded #map{ flex:1 1 auto; height:auto; min-height:280px; }
+  .mapCard.expanded .mapBottomInfo{ flex:none; }
   .mapCard.expanded .mapCaption,
   .mapCard.expanded .mapLegend,
   .mapCard.expanded .circleList,
   .mapCard.expanded .circleEmpty{ flex:none; }
+  /* Tela cheia "limpa": some com os filtros do topo e as informações de baixo (legenda,
+     checkboxes, lista de círculos), deixando só o mapa — um clique no botão "Mostrar
+     detalhes" traz tudo de volta, e some de novo ao clicar mais uma vez. */
+  .mapCard.expanded.chromeHidden .mapFullscreenFilters,
+  .mapCard.expanded.chromeHidden .mapBottomInfo{ display:none; }
 
   .circleList{ margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; }
   .circleChip{
@@ -234,6 +240,8 @@
   .tableScroll{ max-height:440px; overflow-y:auto; overflow-x:auto; }
   table{ width:100%; border-collapse:collapse; font-size:14.5px; }
   thead th{ position:sticky; top:0; background:var(--surface-2); text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); font-weight:600; padding:10px 14px; border-bottom:1px solid var(--border); z-index:1; }
+  thead th[data-key]{ cursor:pointer; user-select:none; white-space:nowrap; }
+  thead th[data-key]:hover{ color:var(--text); }
   th.num, td.num{ text-align:right; }
   tbody td{ padding:9px 14px; border-bottom:1px solid var(--border); vertical-align:middle; }
   tbody tr:last-child td{ border-bottom:none; }
@@ -396,6 +404,7 @@
   <div class="tabBar" id="tabBar" hidden>
     <button type="button" class="tabBtn active" data-tab="mapa" id="tabBtnMapa">Mapa e raio</button>
     <button type="button" class="tabBtn" data-tab="cidades" id="tabBtnCidades">Cidades dos clientes</button>
+    <button type="button" class="tabBtn" data-tab="representantes" id="tabBtnRepresentantes">Por representante</button>
   </div>
 
   <div id="tabMapa">
@@ -439,6 +448,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
           <span>Baixar imagem</span>
         </button>
+        <button type="button" class="expandBtn" id="toggleChromeBtn" hidden title="Mostrar/ocultar filtros e informações na tela cheia">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span id="toggleChromeBtnLabel">Mostrar detalhes</span>
+        </button>
         <button type="button" class="expandBtn" id="expandMapBtn" title="Ver mapa em tela cheia">
           <svg id="expandIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
           <svg id="collapseIcon" hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
@@ -448,27 +461,29 @@
     </div>
     <div class="mapFullscreenFilters" id="mapFullscreenFilters" hidden></div>
     <div id="map"></div>
-    <p class="mapCaption" id="mapCaption">Clique no mapa para criar o primeiro círculo.</p>
-    <p class="downloadStatus" id="mapExportStatus"></p>
-    <p class="tileWarning" id="tileWarning" hidden>
-      <span id="tileWarningText">Vários quadrados do mapa não carregaram — esse provedor pode estar bloqueado.</span>
-      <button type="button" id="tileWarningSwitchBtn">Tentar outro mapa</button>
-    </p>
-    <div class="mapLegend" id="mapLegend" hidden></div>
-    <label class="circleCountToggle" id="mapCountToggleRow" hidden>
-      <input type="checkbox" id="showMapCountsChk">
-      <span>Mostrar quantidade de clientes do lado de cada ponto no mapa</span>
-    </label>
-    <label class="circleCountToggle" id="heatmapToggleRow" hidden>
-      <input type="checkbox" id="showHeatmapChk">
-      <span>Mostrar mapa de calor (densidade de clientes)</span>
-    </label>
-    <label class="circleCountToggle" id="circleCountToggleRow">
-      <input type="checkbox" id="showCircleCountsChk">
-      <span id="circleCountToggleLabel">Mostrar quantidade de municípios em cada círculo</span>
-    </label>
-    <div class="circleList" id="circleList"></div>
-    <p class="circleEmpty" id="circleEmpty">Nenhum círculo criado ainda.</p>
+    <div class="mapBottomInfo" id="mapBottomInfo">
+      <p class="mapCaption" id="mapCaption">Clique no mapa para criar o primeiro círculo.</p>
+      <p class="downloadStatus" id="mapExportStatus"></p>
+      <p class="tileWarning" id="tileWarning" hidden>
+        <span id="tileWarningText">Vários quadrados do mapa não carregaram — esse provedor pode estar bloqueado.</span>
+        <button type="button" id="tileWarningSwitchBtn">Tentar outro mapa</button>
+      </p>
+      <div class="mapLegend" id="mapLegend" hidden></div>
+      <label class="circleCountToggle" id="mapCountToggleRow" hidden>
+        <input type="checkbox" id="showMapCountsChk">
+        <span>Mostrar quantidade de clientes do lado de cada ponto no mapa</span>
+      </label>
+      <label class="circleCountToggle" id="heatmapToggleRow" hidden>
+        <input type="checkbox" id="showHeatmapChk">
+        <span>Mostrar mapa de calor (densidade de clientes)</span>
+      </label>
+      <label class="circleCountToggle" id="circleCountToggleRow">
+        <input type="checkbox" id="showCircleCountsChk">
+        <span id="circleCountToggleLabel">Mostrar quantidade de municípios em cada círculo</span>
+      </label>
+      <div class="circleList" id="circleList"></div>
+      <p class="circleEmpty" id="circleEmpty">Nenhum círculo criado ainda.</p>
+    </div>
   </div>
 
   <div class="resultsHead">
@@ -517,11 +532,34 @@
     </div>
   </div>
 
+  <div id="tabRepresentantes" hidden>
+    <div class="mapCard">
+      <div class="mapHead">
+        <h2>Resumo por representante</h2>
+        <div class="filterField">
+          <input type="text" id="repTabFilter" placeholder="filtrar por representante…">
+        </div>
+      </div>
+      <p class="mapCaption" id="repTabCaption"></p>
+      <div class="tableCard" style="margin-top:10px;">
+        <div class="tableScroll">
+          <table>
+            <thead><tr><th>Representante</th><th class="num">Total</th><th>Por situação</th></tr></thead>
+            <tbody id="repTabBody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="repTabEmpty" hidden>Carregue uma planilha de clientes para ver o resumo por representante aqui.</div>
+      </div>
+    </div>
+  </div>
+
   <footer>
     <p><strong>Metodologia:</strong> distância em linha reta (fórmula de haversine, "como o pássaro voa") do centro de cada círculo até a sede de cada município. Não é distância rodoviária. Quando um município cai em mais de um círculo, a lista mostra o círculo mais próximo e a menor distância. O checkbox "Mostrar quantidade de clientes/municípios em cada círculo" já testa cada círculo sozinho, então quem está dentro de dois círculos que se sobrepõem conta nos dois — por isso a soma dos números de cada círculo pode passar do total único mostrado ali em cima.</p>
     <p id="exportInfo"><strong>Exportação:</strong> o .txt sai no formato "Cidade-Estado" em cada linha (ex.: Porto Alegre-RS) — pensado justamente para quando os círculos caem em estados diferentes, e para ser fácil de cortar o "-UF" no final se um dia precisar só do nome da cidade.</p>
     <p><strong>Clientes no mapa:</strong> assim que a planilha é carregada, todos os clientes já aparecem no mapa (mesmo sem nenhum círculo criado), um ponto por cidade — colorido pela situação com mais clientes ali e maior conforme a quantidade de clientes, com um popup mostrando o total e a divisão por situação ao clicar. Use os checkboxes de situação, o filtro de representante, os checkboxes de estado (UF) e os checkboxes de rede/grupo e pendência financeira para restringir o que aparece — ótimo para enxergar regiões com concentração de inativos antigos, por exemplo. Nos estados, marcar um ou mais UFs mostra só esses; marcar também "Mostrar todos, exceto os marcados" inverte — os UFs marcados viram os únicos de fora, e todo o resto aparece. Sem nenhum UF marcado, os dois jeitos mostram todo mundo. Marcar "Só com rede/grupo" ou "Só com pendência financeira" restringe a lista a quem tem essa característica; marcar "Remover rede/grupo" ou "Remover pendência financeira" faz o oposto, escondendo quem tem — em todo lugar (mapa, lista de raios e aba de cidades). Marcar os dois de um mesmo par ao mesmo tempo é uma contradição de propósito, então a lista fica vazia. Na coluna de pendência, um valor como "PENDÊNCIAS REGULARIZADAS" não conta como pendência ativa — só entra em "Só com pendência financeira" (e fica de fora em "Remover pendência financeira") quem realmente está com pendência em aberto; na tabela de resultados esse texto aparece em verde para diferenciar de uma pendência ainda aberta, que aparece em vermelho. E se você desmarcar todos os checkboxes de situação, a ferramenta volta a mostrar todo mundo em vez de não mostrar ninguém. A planilha não traz endereço geocodificado, então cada cliente é posicionado na coordenada da sede do seu município (Cidade + Estado) — não no endereço exato.</p>
     <p><strong>Baixar imagem do mapa:</strong> o botão "Baixar imagem" no cabeçalho do mapa gera um .png com o que está na tela (mapa, legenda e a contagem de círculos, se estiver marcada) — bom para colar num relatório ou mandar no WhatsApp. Alguns provedores de mapa (no seletor "Provedor do mapa") não deixam captura por uma restrição de segurança do navegador; se aparecer um aviso de erro, é só trocar de provedor ali e tentar de novo.</p>
+    <p><strong>Ordenar a tabela:</strong> clique em qualquer cabeçalho da tabela "Clientes/Municípios encontrados" para ordenar por essa coluna (uma seta indica a direção); clique de novo no mesmo cabeçalho para inverter. Com clientes, a coluna "Dias sem comprar" (vinda direto da planilha) é útil pra ordenar do que está há mais tempo parado pra cá.</p>
+    <p><strong>Resumo por representante:</strong> a aba "Por representante", ao lado de "Cidades dos clientes", mostra quantos clientes cada representante tem em carteira, já quebrado por situação — segue os mesmos filtros marcados (situação, estado, rede, pendência).</p>
     <p><strong>Mapa de calor:</strong> com uma planilha de clientes carregada, o checkbox "Mostrar mapa de calor (densidade de clientes)" (perto do mapa) mostra uma camada de calor por cima dos pontos — fica mais fácil enxergar de longe onde os clientes se concentram, sem contar bolinha por bolinha. Ele segue os mesmos filtros de situação, estado, representante, rede e pendência que já estão marcados, então dá pra isolar, por exemplo, só a concentração de "Inativo antigo".</p>
     <p><strong>Buscar cliente:</strong> logo abaixo do resumo da planilha carregada tem um campo para buscar por nome ou CNPJ (com ou sem pontuação) — ele procura na carteira inteira, sem depender dos filtros ou de já existir um círculo, e ao clicar num resultado o mapa vai até a cidade desse cliente e mostra um marcador destacado em dourado com o nome e o CNPJ no popup. A tabela de clientes encontrados (dentro dos círculos) também ganhou uma coluna de CNPJ, já que é por ela que você costuma procurar o cliente.</p>
     <p><strong>Fontes:</strong> coordenadas dos municípios via IBGE; mapa e ruas © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">colaboradores do OpenStreetMap</a>. Precisa de internet para carregar as imagens do mapa e para ler a planilha (a leitura em si acontece só no seu navegador — o arquivo não é enviado a lugar nenhum).</p>
@@ -652,9 +690,17 @@
   const cityTabFilter = document.getElementById('cityTabFilter');
   const cityTabCaption = document.getElementById('cityTabCaption');
   const unmatchedListEl = document.getElementById('unmatchedList');
+  const tabBtnRepresentantes = document.getElementById('tabBtnRepresentantes');
+  const tabRepresentantesEl = document.getElementById('tabRepresentantes');
+  const repTabBody = document.getElementById('repTabBody');
+  const repTabEmpty = document.getElementById('repTabEmpty');
+  const repTabFilter = document.getElementById('repTabFilter');
+  const repTabCaption = document.getElementById('repTabCaption');
   const resultsTableHeadRow = document.querySelector('#tabMapa table thead tr');
   const mapCardEl = document.getElementById('mapCard');
   const expandMapBtn = document.getElementById('expandMapBtn');
+  const toggleChromeBtn = document.getElementById('toggleChromeBtn');
+  const toggleChromeBtnLabel = document.getElementById('toggleChromeBtnLabel');
   const expandMapBtnLabel = document.getElementById('expandMapBtnLabel');
   const expandIcon = document.getElementById('expandIcon');
   const collapseIcon = document.getElementById('collapseIcon');
@@ -681,18 +727,36 @@
       mapFullscreenFilters.appendChild(vendorFilterRow);
       mapFullscreenFilters.appendChild(ufFilterGroup);
       mapFullscreenFilters.appendChild(extraFiltersRow);
+      // toda vez que entra em tela cheia, começa "limpo" (filtros/detalhes ocultos) pra
+      // aproveitar o máximo de espaço com o mapa — o botão "Mostrar detalhes" traz de volta.
+      toggleChromeBtn.hidden = false;
+      setChromeHidden(true);
     } else {
       mapFullscreenFilters.hidden = true;
       filtersOriginAnchor.parentNode.insertBefore(statusFiltersEl, filtersOriginAnchor);
       filtersOriginAnchor.parentNode.insertBefore(vendorFilterRow, filtersOriginAnchor);
       filtersOriginAnchor.parentNode.insertBefore(ufFilterGroup, filtersOriginAnchor);
       filtersOriginAnchor.parentNode.insertBefore(extraFiltersRow, filtersOriginAnchor);
+      toggleChromeBtn.hidden = true;
+      setChromeHidden(false);
     }
     if (leafletOK) setTimeout(() => map.invalidateSize(), 60);
   }
   expandMapBtn.addEventListener('click', () => setMapExpanded(!mapExpanded));
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && mapExpanded) setMapExpanded(false);
+  });
+
+  // Alterna, dentro da tela cheia, entre mostrar e esconder os filtros do topo e as
+  // informações de baixo (legenda, checkboxes de contagem/calor, lista de círculos) —
+  // clique mostra, clique de novo esconde.
+  function setChromeHidden(hidden){
+    mapCardEl.classList.toggle('chromeHidden', hidden);
+    toggleChromeBtnLabel.textContent = hidden ? 'Mostrar detalhes' : 'Ocultar detalhes';
+    if (leafletOK) setTimeout(() => map.invalidateSize(), 60);
+  }
+  toggleChromeBtn.addEventListener('click', () => {
+    setChromeHidden(!mapCardEl.classList.contains('chromeHidden'));
   });
 
   function haversine(lat1, lon1, lat2, lon2){
@@ -961,6 +1025,7 @@
     circles = [];
     recompute();
     renderCitiesTab();
+    renderRepTab();
   }
 
   removeFileBtn.addEventListener('click', () => {
@@ -998,6 +1063,7 @@
     setupResultsTableHead();
     recompute();
     renderCitiesTab();
+    renderRepTab();
   });
 
   function renderClientSummary(){
@@ -1033,6 +1099,7 @@
     renderStatusFilters();
     recompute();
     renderCitiesTab();
+    renderRepTab();
   }
   window.__toggleStatus = toggleStatus;
 
@@ -1054,6 +1121,7 @@
     activeVendedor = vendorFilterSel.value;
     recompute();
     renderCitiesTab();
+    renderRepTab();
   });
 
   // Um checkbox por estado (UF) presente na planilha, todos desmarcados por padrão (= sem
@@ -1085,6 +1153,7 @@
     renderUFFilters();
     recompute();
     renderCitiesTab();
+    renderRepTab();
   }
   window.__toggleUF = toggleUF;
 
@@ -1093,6 +1162,7 @@
     ufInvertPill.classList.toggle('off', !ufFilterInvert);
     recompute();
     renderCitiesTab();
+    renderRepTab();
   });
 
   // Legend for the "all clients" overview layer on the map — one dot per situação present.
@@ -1149,24 +1219,28 @@
     filterRedePill.classList.toggle('off', !filterOnlyRede);
     recompute();
     renderCitiesTab();
+    renderRepTab();
   });
   filterNoRedeChk.addEventListener('change', () => {
     filterNoRede = filterNoRedeChk.checked;
     filterNoRedePill.classList.toggle('off', !filterNoRede);
     recompute();
     renderCitiesTab();
+    renderRepTab();
   });
   filterPendChk.addEventListener('change', () => {
     filterOnlyPend = filterPendChk.checked;
     filterPendPill.classList.toggle('off', !filterOnlyPend);
     recompute();
     renderCitiesTab();
+    renderRepTab();
   });
   filterNoPendChk.addEventListener('change', () => {
     filterNoPend = filterNoPendChk.checked;
     filterNoPendPill.classList.toggle('off', !filterNoPend);
     recompute();
     renderCitiesTab();
+    renderRepTab();
   });
 
   function buildCityAgg(clients){
@@ -1244,20 +1318,85 @@
 
   function setupResultsTableHead(){
     resultsTableHeadRow.innerHTML = clientsLoaded
-      ? `<th style="width:32px">#</th><th>Cliente</th><th>CNPJ</th><th>Cidade</th><th>Situação</th><th>Representante</th><th>Grupo/Rede</th><th>Pendência</th><th>Círculo</th><th class="num">Distância</th>`
-      : `<th style="width:32px">#</th><th>Município</th><th>Círculo</th><th class="num">Distância</th>`;
+      ? `<th style="width:32px">#</th><th data-key="nome">Cliente</th><th data-key="cnpj">CNPJ</th><th data-key="cidade">Cidade</th><th data-key="situacao">Situação</th><th data-key="vendedor">Representante</th><th data-key="grupo">Grupo/Rede</th><th data-key="pendencia">Pendência</th><th data-key="dias" class="num">Dias sem comprar</th><th data-key="circulo">Círculo</th><th data-key="distancia" class="num">Distância</th>`
+      : `<th style="width:32px">#</th><th data-key="municipio">Município</th><th data-key="circulo">Círculo</th><th data-key="distancia" class="num">Distância</th>`;
+    sortState = { key: null, dir: 1 };
+    updateSortArrows();
   }
+
+  // Ordenação clicável em qualquer cabeçalho de coluna da tabela de resultados (dentro dos
+  // círculos). Clicar de novo no mesmo cabeçalho inverte a direção; trocar de coluna volta a
+  // ordenar crescente. "null"/vazio sempre fica por último, em qualquer direção.
+  let sortState = { key: null, dir: 1 };
+  function diasNumber(v){
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(String(v).replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  }
+  const CLIENT_SORT_COLS = {
+    nome: { get: r => r.client.nome },
+    cnpj: { get: r => r.client.cnpj },
+    cidade: { get: r => r.client.cidade },
+    situacao: { get: r => (STATUS_BY_KEY[r.client.statusKey] || STATUS_FALLBACK).label },
+    vendedor: { get: r => r.client.vendedor },
+    grupo: { get: r => r.client.grupo },
+    pendencia: { get: r => r.client.devedores },
+    dias: { get: r => diasNumber(r.client.dias) },
+    circulo: { get: r => r.bestCircleId },
+    distancia: { get: r => r.bestD },
+  };
+  const GENERIC_SORT_COLS = {
+    municipio: { get: r => r.n },
+    circulo: { get: r => r.bestCircleId },
+    distancia: { get: r => r.bestD },
+  };
+  function sortRows(rows){
+    if (!sortState.key) return rows;
+    const cfg = (clientsLoaded ? CLIENT_SORT_COLS : GENERIC_SORT_COLS)[sortState.key];
+    if (!cfg) return rows;
+    return rows.slice().sort((a, b) => {
+      const va = cfg.get(a), vb = cfg.get(b);
+      const aNull = (va === null || va === undefined || va === '');
+      const bNull = (vb === null || vb === undefined || vb === '');
+      if (aNull && bNull) return 0;
+      if (aNull) return 1;
+      if (bNull) return -1;
+      const cmp = (typeof va === 'number' && typeof vb === 'number')
+        ? va - vb
+        : String(va).localeCompare(String(vb), 'pt-BR', { numeric: true, sensitivity: 'base' });
+      return cmp * sortState.dir;
+    });
+  }
+  function updateSortArrows(){
+    resultsTableHeadRow.querySelectorAll('th[data-key]').forEach(th => {
+      if (th.dataset.label === undefined) th.dataset.label = th.textContent;
+      th.textContent = th.dataset.label + (th.dataset.key === sortState.key ? (sortState.dir === 1 ? ' ▲' : ' ▼') : '');
+    });
+  }
+  resultsTableHeadRow.addEventListener('click', (e) => {
+    const th = e.target.closest('th[data-key]');
+    if (!th) return;
+    const key = th.dataset.key;
+    if (sortState.key === key) sortState.dir *= -1;
+    else { sortState.key = key; sortState.dir = 1; }
+    updateSortArrows();
+    applyFilter();
+  });
 
   function switchTab(name){
     tabBtnMapa.classList.toggle('active', name === 'mapa');
     tabBtnCidades.classList.toggle('active', name === 'cidades');
+    tabBtnRepresentantes.classList.toggle('active', name === 'representantes');
     tabMapaEl.hidden = name !== 'mapa';
     tabCidadesEl.hidden = name !== 'cidades';
+    tabRepresentantesEl.hidden = name !== 'representantes';
     if (name === 'cidades') renderCitiesTab();
+    if (name === 'representantes') renderRepTab();
     if (name === 'mapa' && leafletOK) setTimeout(() => map.invalidateSize(), 50);
   }
   tabBtnMapa.addEventListener('click', () => switchTab('mapa'));
   tabBtnCidades.addEventListener('click', () => switchTab('cidades'));
+  tabBtnRepresentantes.addEventListener('click', () => switchTab('representantes'));
 
   function renderCitiesTab(){
     if (!clientsLoaded){
@@ -1301,6 +1440,49 @@
     }
   }
   cityTabFilter.addEventListener('input', renderCitiesTab);
+
+  // Mini raio-x da carteira por representante: um por cliente que passa nos filtros
+  // atuais (situação, estado, rede, pendência — os mesmos que o resto da ferramenta usa),
+  // agrupado por "Vendedor do último pedido" e quebrado por situação, igual à aba de cidades.
+  function renderRepTab(){
+    if (!clientsLoaded){
+      repTabBody.innerHTML = '';
+      repTabEmpty.hidden = false;
+      repTabEmpty.textContent = 'Carregue uma planilha de clientes para ver o resumo por representante aqui.';
+      repTabCaption.textContent = '';
+      return;
+    }
+    const filtered = getFilteredClients();
+    const agg = new Map();
+    filtered.forEach(r => {
+      const label = r.vendedor || 'Sem representante';
+      let entry = agg.get(label);
+      if (!entry){ entry = { label, total: 0, counts: {} }; agg.set(label, entry); }
+      entry.total++;
+      entry.counts[r.statusKey] = (entry.counts[r.statusKey] || 0) + 1;
+    });
+    let rows = Array.from(agg.values()).sort((a, b) => b.total - a.total);
+    const q = repTabFilter.value.trim().toLowerCase();
+    if (q) rows = rows.filter(r => r.label.toLowerCase().includes(q));
+
+    repTabCaption.textContent = `${agg.size.toLocaleString('pt-BR')} representante(s) · ${filtered.length.toLocaleString('pt-BR')} cliente(s) (considerando os filtros marcados acima).`;
+
+    if (!rows.length){
+      repTabBody.innerHTML = '';
+      repTabEmpty.hidden = false;
+      repTabEmpty.textContent = 'Nenhum representante encontrado com esse filtro.';
+    } else {
+      repTabEmpty.hidden = true;
+      repTabBody.innerHTML = rows.map(r => `
+        <tr>
+          <td class="city">${r.label}</td>
+          <td class="num">${r.total}</td>
+          <td><div class="cityBreakdown">${Object.keys(r.counts).map(k => `<span class="badge" style="background:${hexToRgba(STATUS_BY_KEY[k].color,0.14)};color:${STATUS_BY_KEY[k].color}"><span class="dot" style="background:${STATUS_BY_KEY[k].color}"></span>${r.counts[k]} ${STATUS_BY_KEY[k].label}</span>`).join('')}</div></td>
+        </tr>
+      `).join('');
+    }
+  }
+  repTabFilter.addEventListener('input', renderRepTab);
 
   function focusLatLon(lat, lon){
     if (leafletOK && lat != null && lon != null) map.panTo([lat, lon]);
@@ -1878,6 +2060,7 @@
         ? currentRows.filter(r => (r.client.nome || '').toLowerCase().includes(q) || (r.client.cidade || '').toLowerCase().includes(q) || (r.client.uf || '').toLowerCase() === q)
         : currentRows.filter(r => r.n.toLowerCase().includes(q) || r.u.toLowerCase() === q);
     }
+    rows = sortRows(rows);
     renderTable(rows);
   }
   filterInput.addEventListener('input', () => applyFilter());
@@ -1914,6 +2097,8 @@
         const pendenciaCell = c.devedores
           ? `<span class="badge" style="background:${hexToRgba(pendCor,0.14)};color:${pendCor}">${c.devedores}</span>`
           : `<span style="color:var(--muted)">—</span>`;
+        const diasN = diasNumber(c.dias);
+        const diasCell = diasN != null ? `${diasN.toLocaleString('pt-BR')} dias` : (c.dias || '<span style="color:var(--muted)">—</span>');
         return `
         <tr onclick="__focusLatLon(${c.lat}, ${c.lon})">
           <td class="rank">${i+1}</td>
@@ -1924,6 +2109,7 @@
           <td>${c.vendedor || ''}</td>
           <td>${c.grupo || ''}</td>
           <td>${pendenciaCell}</td>
+          <td class="mono">${diasCell}</td>
           <td class="circleCol"><span class="dot" style="background:${r.bestColor}"></span>${circleTxt}</td>
           <td class="dist">${fmt(r.bestD)} km</td>
         </tr>`;
@@ -1971,6 +2157,7 @@
     setTimeout(() => downloadStatus.textContent = '', 3000);
   });
 
+  setupResultsTableHead();
   recompute();
 </script>
 </body>
