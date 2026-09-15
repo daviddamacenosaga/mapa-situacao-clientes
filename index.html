@@ -400,6 +400,8 @@
     <div class="vendorFilterRow" id="vendorFilterRow" hidden>
       <label for="vendorFilter">Representante</label>
       <select id="vendorFilter"></select>
+      <label for="hideVendorFilter" title="Esconde os clientes desse representante da lista — útil quando esses clientes já estão na carteira dele e não precisam ser repassados de novo">Ocultar representante</label>
+      <select id="hideVendorFilter"></select>
     </div>
     <div class="ufFilterGroup" id="ufFilterGroup" hidden>
       <div class="ufFilterBar">
@@ -598,7 +600,7 @@
     <p><strong>Metodologia:</strong> distância em linha reta (fórmula de haversine, "como o pássaro voa") do centro de cada círculo até a sede de cada município. Não é distância rodoviária. Quando um município cai em mais de um círculo, a lista mostra o círculo mais próximo e a menor distância. O checkbox "Mostrar quantidade de clientes/municípios em cada círculo" já testa cada círculo sozinho, então quem está dentro de dois círculos que se sobrepõem conta nos dois — por isso a soma dos números de cada círculo pode passar do total único mostrado ali em cima.</p>
     <p><strong>Editar um círculo já criado:</strong> arraste o ponto central do círculo (a bolinha colorida) para movê-lo para outro lugar do mapa — o raio some junto, em tempo real. Para mudar o tamanho do raio, edite o número "km" direto no card do círculo, na lista abaixo do mapa (ex.: trocar 100 por 50) e aperte Enter ou clique fora; a tabela, o mapa de calor e as contagens são recalculados na hora.</p>
     <p id="exportInfo"><strong>Exportação:</strong> o .txt sai no formato "Cidade-Estado" em cada linha (ex.: Porto Alegre-RS) — pensado justamente para quando os círculos caem em estados diferentes, e para ser fácil de cortar o "-UF" no final se um dia precisar só do nome da cidade.</p>
-    <p><strong>Clientes no mapa:</strong> assim que a planilha é carregada, todos os clientes já aparecem no mapa (mesmo sem nenhum círculo criado), um ponto por cidade — colorido pela situação com mais clientes ali e maior conforme a quantidade de clientes, com um popup mostrando o total e a divisão por situação ao clicar. Use os checkboxes de situação, o filtro de representante, os checkboxes de estado (UF) e os checkboxes de rede/grupo e pendência financeira para restringir o que aparece — ótimo para enxergar regiões com concentração de inativos antigos, por exemplo. Nos estados, marcar um ou mais UFs mostra só esses; marcar também "Mostrar todos, exceto os marcados" inverte — os UFs marcados viram os únicos de fora, e todo o resto aparece. Sem nenhum UF marcado, os dois jeitos mostram todo mundo. Marcar "Só com rede/grupo" ou "Só com pendência financeira" restringe a lista a quem tem essa característica; marcar "Remover rede/grupo" ou "Remover pendência financeira" faz o oposto, escondendo quem tem — em todo lugar (mapa, lista de raios e aba de cidades). Marcar os dois de um mesmo par ao mesmo tempo é uma contradição de propósito, então a lista fica vazia. Na coluna de pendência, um valor como "PENDÊNCIAS REGULARIZADAS" não conta como pendência ativa — só entra em "Só com pendência financeira" (e fica de fora em "Remover pendência financeira") quem realmente está com pendência em aberto; na tabela de resultados esse texto aparece em verde para diferenciar de uma pendência ainda aberta, que aparece em vermelho. E se você desmarcar todos os checkboxes de situação, a ferramenta volta a mostrar todo mundo em vez de não mostrar ninguém. A planilha não traz endereço geocodificado, então cada cliente é posicionado na coordenada da sede do seu município (Cidade + Estado) — não no endereço exato.</p>
+    <p><strong>Clientes no mapa:</strong> assim que a planilha é carregada, todos os clientes já aparecem no mapa (mesmo sem nenhum círculo criado), um ponto por cidade — colorido pela situação com mais clientes ali e maior conforme a quantidade de clientes, com um popup mostrando o total e a divisão por situação ao clicar. Use os checkboxes de situação, o filtro de representante, os checkboxes de estado (UF) e os checkboxes de rede/grupo e pendência financeira para restringir o que aparece — ótimo para enxergar regiões com concentração de inativos antigos, por exemplo. Ao lado do filtro "Representante" (que mostra só quem é daquele representante) tem o "Ocultar representante" — o oposto: escolha um nome ali e a lista (mapa, tabela, mapa de calor, aba de cidades e de representantes) esconde quem já está na carteira dele, útil pra ver só quem ainda não foi repassado pra ninguém específico antes de mandar a lista pra um representante. Nos estados, marcar um ou mais UFs mostra só esses; marcar também "Mostrar todos, exceto os marcados" inverte — os UFs marcados viram os únicos de fora, e todo o resto aparece. Sem nenhum UF marcado, os dois jeitos mostram todo mundo. Marcar "Só com rede/grupo" ou "Só com pendência financeira" restringe a lista a quem tem essa característica; marcar "Remover rede/grupo" ou "Remover pendência financeira" faz o oposto, escondendo quem tem — em todo lugar (mapa, lista de raios e aba de cidades). Marcar os dois de um mesmo par ao mesmo tempo é uma contradição de propósito, então a lista fica vazia. Na coluna de pendência, um valor como "PENDÊNCIAS REGULARIZADAS" não conta como pendência ativa — só entra em "Só com pendência financeira" (e fica de fora em "Remover pendência financeira") quem realmente está com pendência em aberto; na tabela de resultados esse texto aparece em verde para diferenciar de uma pendência ainda aberta, que aparece em vermelho. E se você desmarcar todos os checkboxes de situação, a ferramenta volta a mostrar todo mundo em vez de não mostrar ninguém. A planilha não traz endereço geocodificado, então cada cliente é posicionado na coordenada da sede do seu município (Cidade + Estado) — não no endereço exato.</p>
     <p><strong>Baixar imagem do mapa:</strong> o botão "Baixar imagem" no cabeçalho do mapa gera um .png com o que está na tela (mapa, legenda e a contagem de círculos, se estiver marcada) — bom para colar num relatório ou mandar no WhatsApp. Alguns provedores de mapa (no seletor "Provedor do mapa") não deixam captura por uma restrição de segurança do navegador; se aparecer um aviso de erro, é só trocar de provedor ali e tentar de novo.</p>
     <p><strong>Popup com a lista de clientes:</strong> clicar num ponto do mapa (seja no ponto geral da cidade ou no marcador dentro de um círculo) abre, além do resumo por situação, a lista de clientes daquela cidade — razão social, CNPJ, a situação de cada um (com a mesma cor de sempre) e, quando existem, o representante e os dias sem comprar. Em cidades com muitos clientes a lista é cortada (a partir de 25) com um aviso apontando pra tabela completa logo abaixo do mapa, que já tem a coluna de CNPJ.</p>
     <p><strong>Ordenar a tabela:</strong> clique em qualquer cabeçalho da tabela "Clientes/Municípios encontrados" para ordenar por essa coluna (uma seta indica a direção); clique de novo no mesmo cabeçalho para inverter. Com clientes, a coluna "Dias sem comprar" (vinda direto da planilha) é útil pra ordenar do que está há mais tempo parado pra cá.</p>
@@ -708,6 +710,7 @@
   const statusFiltersEl = document.getElementById('statusFilters');
   const vendorFilterRow = document.getElementById('vendorFilterRow');
   const vendorFilterSel = document.getElementById('vendorFilter');
+  const hideVendorFilterSel = document.getElementById('hideVendorFilter');
   const mapLegendEl = document.getElementById('mapLegend');
   const ufFilterGroup = document.getElementById('ufFilterGroup');
   const ufFiltersRow = document.getElementById('ufFiltersRow');
@@ -934,6 +937,7 @@
   let clientsLoaded = false;
   let activeStatuses = new Set();
   let activeVendedor = ''; // '' = todos os representantes
+  let hideVendedor = ''; // '' = não oculta ninguém; caso contrário, esconde quem já está com esse representante
   let filterOnlyRede = false; // true = mostra so quem tem rede/grupo (checkbox marcado)
   let filterOnlyPend = false; // true = mostra so quem tem pendencia financeira (checkbox marcado)
   let filterNoRede = false; // true = remove (esconde) quem tem rede/grupo
@@ -1051,6 +1055,7 @@
     clientsLoaded = true;
     activeStatuses = new Set(clientRows.map(r => r.statusKey));
     activeVendedor = '';
+    hideVendedor = '';
     activeUFs = new Set();
     ufFilterInvert = false;
     filterOnlyRede = false;
@@ -1093,6 +1098,7 @@
     clientsLoaded = false;
     activeStatuses = new Set();
     activeVendedor = '';
+    hideVendedor = '';
     activeUFs = new Set();
     ufFilterInvert = false;
     filterOnlyRede = false;
@@ -1193,10 +1199,23 @@
     vendorFilterSel.innerHTML = ['<option value="">Todos os representantes</option>']
       .concat(names.map(n => `<option value="${n.replace(/"/g,'&quot;')}">${n}</option>`)).join('');
     vendorFilterSel.value = activeVendedor;
+    hideVendorFilterSel.innerHTML = ['<option value="">Nenhum (mostrar todos)</option>']
+      .concat(names.map(n => `<option value="${n.replace(/"/g,'&quot;')}">${n}</option>`)).join('');
+    hideVendorFilterSel.value = hideVendedor;
   }
 
   vendorFilterSel.addEventListener('change', () => {
     activeVendedor = vendorFilterSel.value;
+    recompute();
+    renderCitiesTab();
+    renderRepTab();
+  });
+
+  // "Ocultar representante": esconde da lista quem já está na carteira desse representante
+  // (ele já é o "Vendedor do último pedido" desse cliente) — pensado pra quem quer ver só
+  // clientes que ainda não são de ninguém específico, sem duplicar quem já foi repassado.
+  hideVendorFilterSel.addEventListener('change', () => {
+    hideVendedor = hideVendorFilterSel.value;
     recompute();
     renderCitiesTab();
     renderRepTab();
@@ -1262,6 +1281,7 @@
     return clientRows.filter(r =>
       (activeStatuses.size === 0 || activeStatuses.has(r.statusKey)) &&
       (!activeVendedor || r.vendedor === activeVendedor) &&
+      (!hideVendedor || r.vendedor !== hideVendedor) &&
       (activeUFs.size === 0 || (ufFilterInvert ? !activeUFs.has(r.uf) : activeUFs.has(r.uf))) &&
       (!filterOnlyRede || !!r.grupo) &&
       (!filterNoRede || !r.grupo) &&
