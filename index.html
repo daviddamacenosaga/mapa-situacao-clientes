@@ -929,6 +929,14 @@
   let filterOnlyPend = false; // true = mostra so quem tem pendencia financeira (checkbox marcado)
   let filterNoRede = false; // true = remove (esconde) quem tem rede/grupo
   let filterNoPend = false; // true = remove (esconde) quem tem pendencia financeira
+  // "Quase inativo (60-90 dias sem comprar)": filtro extra baseado só na coluna "Dias sem
+  // comprar" da planilha, independente da Situação que ela já traz — não reclassifica
+  // ninguém nem muda a cor/badge de ninguém, só restringe a lista quando marcado.
+  let filterDiasFaixa = false;
+  function isQuaseInativoDias(dias){
+    const n = diasNumber(dias);
+    return n != null && n >= 60 && n <= 90;
+  }
   let activeUFs = new Set(); // estados marcados; vazio = nenhuma restrição de estado
   let ufFilterInvert = false; // false = mostra só os estados marcados; true = mostra todos, exceto os marcados
   let selectedClientIds = new Set(); // clientes marcados na tabela, para o botão "Copiar selecionados" — não é resetado por filtro/ordenação, só por novo upload/remoção
@@ -1040,6 +1048,7 @@
     filterOnlyPend = false;
     filterNoRede = false;
     filterNoPend = false;
+    filterDiasFaixa = false;
     selectedClientIds = new Set();
     copySelectedBtn.hidden = false;
     updateCopySelectedBtn();
@@ -1081,6 +1090,7 @@
     filterOnlyPend = false;
     filterNoRede = false;
     filterNoPend = false;
+    filterDiasFaixa = false;
     selectedClientIds = new Set();
     copySelectedBtn.hidden = true;
     copyStatus.textContent = '';
@@ -1128,6 +1138,7 @@
     const counts = {};
     clientRows.forEach(r => { counts[r.statusKey] = (counts[r.statusKey] || 0) + 1; });
     const defs = STATUS_DEFS.concat([STATUS_FALLBACK]).filter(s => counts[s.key]);
+    const quaseDiasCount = clientRows.filter(r => isQuaseInativoDias(r.dias)).length;
     statusFiltersEl.hidden = false;
     statusFiltersEl.innerHTML = defs.map(s => `
       <label class="statusPill ${activeStatuses.has(s.key) ? '' : 'off'}">
@@ -1135,7 +1146,13 @@
         <span class="dot" style="background:${s.color}"></span>
         ${s.label} <span class="cnt">(${counts[s.key]})</span>
       </label>
-    `).join('');
+    `).join('') + `
+      <label class="statusPill ${filterDiasFaixa ? '' : 'off'}" title="Filtro extra pela coluna 'Dias sem comprar' — não muda a Situação nem a cor de ninguém, só restringe a lista.">
+        <input type="checkbox" ${filterDiasFaixa ? 'checked' : ''} onchange="__toggleQuaseDiasFilter(this.checked)">
+        <span class="dot" style="background:#b8862e"></span>
+        Quase inativo (60-90 dias sem comprar) <span class="cnt">(${quaseDiasCount.toLocaleString('pt-BR')})</span>
+      </label>
+    `;
   }
 
   function toggleStatus(key, on){
@@ -1146,6 +1163,14 @@
     renderRepTab();
   }
   window.__toggleStatus = toggleStatus;
+
+  window.__toggleQuaseDiasFilter = function(on){
+    filterDiasFaixa = on;
+    renderStatusFilters();
+    recompute();
+    renderCitiesTab();
+    renderRepTab();
+  };
 
   // "Representante" dropdown: single choice, defaults to "todos". Built from whatever
   // names show up in the "Vendedor do último pedido" column of the loaded spreadsheet.
@@ -1232,7 +1257,8 @@
       (!filterOnlyRede || !!r.grupo) &&
       (!filterNoRede || !r.grupo) &&
       (!filterOnlyPend || isPendenciaAtiva(r.devedores)) &&
-      (!filterNoPend || !isPendenciaAtiva(r.devedores))
+      (!filterNoPend || !isPendenciaAtiva(r.devedores)) &&
+      (!filterDiasFaixa || isQuaseInativoDias(r.dias))
     );
   }
 
