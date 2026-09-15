@@ -306,6 +306,54 @@
   }
   .leaflet-tooltip.cityCountLabel::before{ display:none; }
 
+  /* Nome do cliente na tabela vira clicável quando a planilha de pedidos está carregada,
+     pra abrir o resumo de pedidos daquele cliente sem também disparar o foco no mapa
+     (que é o que o clique no resto da linha continua fazendo). */
+  td.clientNameCell.clickable{ cursor:pointer; color:var(--accent); text-decoration:underline; text-decoration-color:var(--accent-soft); text-underline-offset:2px; }
+  td.clientNameCell.clickable:hover{ text-decoration-color:var(--accent); }
+
+  .orderModalOverlay{
+    position:fixed; inset:0; background:rgba(10,14,11,0.45); z-index:900;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .orderModalBox{
+    background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow);
+    width:min(560px, 100%); max-height:min(640px, 90vh); display:flex; flex-direction:column; overflow:hidden;
+  }
+  .orderModalHead{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+    padding:16px 18px 12px; border-bottom:1px solid var(--border);
+  }
+  .orderModalHead h3{ margin:0 0 3px; font-size:16px; }
+  .orderModalHead .d{ color:var(--muted); font-size:12.5px; font-family:"IBM Plex Mono", monospace; }
+  .orderModalCloseBtn{
+    flex:none; border:none; background:var(--surface-2); color:var(--text); width:26px; height:26px; border-radius:50%;
+    cursor:pointer; font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center;
+  }
+  .orderModalStats{
+    display:flex; gap:10px; padding:14px 18px; flex-wrap:wrap; border-bottom:1px solid var(--border);
+  }
+  .orderModalStats .stat{ background:var(--surface-2); border-radius:9px; padding:8px 12px; min-width:100px; }
+  .orderModalStats .stat .n{ font:700 17px "IBM Plex Mono", monospace; }
+  .orderModalStats .stat .l{ color:var(--muted); font-size:11px; margin-top:1px; }
+  .orderModalListWrap{ overflow-y:auto; padding:6px 18px 16px; }
+  .orderModalListWrap table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .orderModalListWrap th{ text-align:left; color:var(--muted); font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:0.05em; padding:8px 6px 6px; position:sticky; top:0; background:var(--surface); }
+  .orderModalListWrap td{ padding:6px 6px; border-top:1px solid var(--border); }
+  .orderModalListWrap td.num{ font-family:"IBM Plex Mono", monospace; text-align:right; white-space:nowrap; }
+  .orderModalEmpty{ padding:24px 18px; color:var(--muted); font-size:13px; text-align:center; }
+  .orderModalMore{ color:var(--muted); font-size:11px; padding:8px 6px 0; }
+
+  /* "Cliente importante sumindo": valor histórico alto + muito tempo sem comprar —
+     linha sutilmente destacada na tabela, mais um símbolo de alerta junto do nome. */
+  .vipRow{ background:rgba(156,41,99,0.055); }
+  .vipRow:hover{ background:rgba(156,41,99,0.12); }
+  .vipBadge{ color:#9c2963; margin-right:5px; font-size:12px; }
+  .orderModalVipTag{
+    display:inline-flex; align-items:center; gap:5px; font:600 11px "IBM Plex Sans", sans-serif; color:#9c2963;
+    background:rgba(156,41,99,0.12); border-radius:6px; padding:3px 8px; margin-top:6px;
+  }
+
   .themeSwitcher{
     position:fixed; top:14px; right:14px; z-index:500; display:flex; gap:6px; align-items:center;
     background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:6px;
@@ -385,6 +433,17 @@
     </div>
     <p class="clientStatusMsg" id="clientStatusMsg"></p>
     <div class="clientSummary" id="clientSummary" hidden></div>
+    <div class="clientPanelHead ordersFileBlock" id="ordersFileBlock" hidden>
+      <div>
+        <label for="ordersFile" class="clientLabel">Planilha de pedidos (opcional)</label>
+        <p class="clientHint">Carregue a planilha de controle de pedidos (com as abas COMERCIAL e B.D. CLIENTES) para ver, por cliente, quantos pedidos válidos e qual valor total — cruzando pelo CNPJ. Só entram pedidos com "CONTABILIZAR?" = SIM, e o valor somado é o de "ENTRADA R$".</p>
+      </div>
+      <div class="clientFileRow">
+        <input type="file" id="ordersFile" accept=".xlsm,.xlsx,.xls">
+        <button type="button" class="clearBtn" id="removeOrdersBtn" hidden>Remover pedidos</button>
+      </div>
+    </div>
+    <p class="clientStatusMsg" id="ordersStatusMsg"></p>
     <div class="clientSearchRow" id="clientSearchRow" hidden>
       <label for="clientSearchInput">Buscar cliente por nome ou CNPJ (localiza no mapa)</label>
       <div class="clientSearchWrap">
@@ -444,6 +503,11 @@
         <input type="checkbox" id="filterNoTagChk">
         <span class="dot" style="background:#8a4a7a"></span>
         <span id="filterNoTagLabel">Remover tag de cliente</span>
+      </label>
+      <label class="statusPill" id="filterVipPill" hidden title="Cliente com valor alto no histórico de pedidos (entre os 25% que mais compraram) que parou de comprar há bastante tempo — some da lista de inativos comuns porque hoje ela trata do mesmo jeito um cliente pequeno e um cliente grande.">
+        <input type="checkbox" id="filterVipChk">
+        <span class="dot" style="background:#9c2963"></span>
+        <span id="filterVipLabel">Cliente importante sumindo</span>
       </label>
     </div>
     <span id="filtersOriginAnchor" hidden></span>
@@ -617,8 +681,24 @@
     <p><strong>Resumo por representante:</strong> a aba "Por representante", ao lado de "Cidades dos clientes", mostra quantos clientes cada representante tem em carteira, já quebrado por situação — segue os mesmos filtros marcados (situação, estado, rede, pendência).</p>
     <p><strong>Mapa de calor:</strong> com uma planilha de clientes carregada, o checkbox "Mostrar mapa de calor (densidade de clientes)" (perto do mapa) mostra uma camada de calor por cima dos pontos — fica mais fácil enxergar de longe onde os clientes se concentram, sem contar bolinha por bolinha. Ele segue os mesmos filtros de situação, estado, representante, rede e pendência que já estão marcados, então dá pra isolar, por exemplo, só a concentração de "Inativo antigo".</p>
     <p><strong>Buscar cliente:</strong> logo abaixo do resumo da planilha carregada tem um campo para buscar por nome ou CNPJ (com ou sem pontuação) — ele procura na carteira inteira, sem depender dos filtros ou de já existir um círculo, e ao clicar num resultado o mapa vai até a cidade desse cliente e mostra um marcador destacado em dourado com o nome e o CNPJ no popup. A tabela de clientes encontrados (dentro dos círculos) também ganhou uma coluna de CNPJ, já que é por ela que você costuma procurar o cliente.</p>
+    <p><strong>Histórico de pedidos:</strong> logo abaixo da planilha de clientes tem um segundo upload, opcional, para a planilha de controle de pedidos (com as abas COMERCIAL e B.D. CLIENTES) — ela cruza os pedidos com cada cliente pelo CNPJ, contando só pedidos com "CONTABILIZAR?" = SIM e somando o valor de "ENTRADA R$". Com ela carregada, a tabela ganha as colunas "Pedidos" e "Valor pedidos", e clicar em cima do NOME do cliente (na tabela) abre um resumo com o total de pedidos, valor total, ticket médio, data do pedido mais recente e a lista de pedidos individuais (data, status e valor) daquele cliente — sem mudar o clique no resto da linha, que continua levando até ele no mapa.</p>
+    <p><strong>Cliente importante sumindo:</strong> com a planilha de pedidos carregada, a ferramenta cruza o valor histórico de cada cliente com os dias sem comprar da planilha de clientes, pra achar quem já foi um bom cliente e parou — algo que a lista comum de inativos não mostra, porque ali um cliente de R$ 500 e um de R$ 300 mil aparecem exatamente iguais. Entram nessa marcação os clientes com 60 dias ou mais sem comprar E com valor total no histórico de pedidos entre os 25% mais altos de toda a carteira carregada (não é um valor fixo em reais — se ajusta ao tamanho da própria planilha). Esses clientes ganham um ⚠ do lado do nome e a linha fica com um leve destaque na tabela, também aparecem marcados no popup do mapa e no resumo de pedidos (ao clicar no nome); tem também um filtro "Cliente importante sumindo", ao lado dos outros filtros extras, pra ver só eles.</p>
     <p><strong>Fontes:</strong> coordenadas dos municípios via IBGE; mapa e ruas © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">colaboradores do OpenStreetMap</a>. Precisa de internet para carregar as imagens do mapa e para ler a planilha (a leitura em si acontece só no seu navegador — o arquivo não é enviado a lugar nenhum).</p>
   </footer>
+</div>
+
+<div class="orderModalOverlay" id="orderModalOverlay" hidden>
+  <div class="orderModalBox" role="dialog" aria-modal="true">
+    <div class="orderModalHead">
+      <div>
+        <h3 id="orderModalTitle">Cliente</h3>
+        <div class="d" id="orderModalCnpj"></div>
+      </div>
+      <button type="button" class="orderModalCloseBtn" id="orderModalCloseBtn" title="Fechar">✕</button>
+    </div>
+    <div class="orderModalStats" id="orderModalStats"></div>
+    <div class="orderModalListWrap" id="orderModalListWrap"></div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -712,6 +792,16 @@
   const removeFileBtn = document.getElementById('removeFileBtn');
   const clientStatusMsg = document.getElementById('clientStatusMsg');
   const clientSummary = document.getElementById('clientSummary');
+  const ordersFileBlock = document.getElementById('ordersFileBlock');
+  const ordersFile = document.getElementById('ordersFile');
+  const removeOrdersBtn = document.getElementById('removeOrdersBtn');
+  const ordersStatusMsg = document.getElementById('ordersStatusMsg');
+  const orderModalOverlay = document.getElementById('orderModalOverlay');
+  const orderModalTitle = document.getElementById('orderModalTitle');
+  const orderModalCnpj = document.getElementById('orderModalCnpj');
+  const orderModalStatsEl = document.getElementById('orderModalStats');
+  const orderModalListWrap = document.getElementById('orderModalListWrap');
+  const orderModalCloseBtn = document.getElementById('orderModalCloseBtn');
   const clientSearchRow = document.getElementById('clientSearchRow');
   const clientSearchInput = document.getElementById('clientSearchInput');
   const clientSearchResultsEl = document.getElementById('clientSearchResults');
@@ -744,6 +834,9 @@
   const filterTagLabel = document.getElementById('filterTagLabel');
   const filterNoTagChk = document.getElementById('filterNoTagChk');
   const filterNoTagPill = document.getElementById('filterNoTagPill');
+  const filterVipChk = document.getElementById('filterVipChk');
+  const filterVipPill = document.getElementById('filterVipPill');
+  const filterVipLabel = document.getElementById('filterVipLabel');
   const filterNoTagLabel = document.getElementById('filterNoTagLabel');
   const tabBar = document.getElementById('tabBar');
   const tabBtnMapa = document.getElementById('tabBtnMapa');
@@ -969,9 +1062,307 @@
     const n = diasNumber(dias);
     return n != null && n >= 60 && n <= 90;
   }
+
+  // "Cliente importante sumindo": cruza valor histórico alto (planilha de pedidos) com
+  // dias sem comprar alto (planilha de clientes) — os dois sozinhos não mostram isso; a
+  // lista de inativos trata igual um cliente de R$500 e um de R$300 mil. "Valor alto" é
+  // relativo à própria carteira carregada (top 25% de quem tem pedido), não um número fixo
+  // em reais, pra continuar fazendo sentido em qualquer tamanho de operação/ano.
+  const VIP_DIAS_THRESHOLD = 60;
+  const VIP_VALUE_PERCENTILE = 0.75; // top 25% dos valores
+  let filterOnlyVip = false;
+  let vipValueThreshold = 0;
+  function recomputeVipThreshold(){
+    if (!ordersLoaded){ vipValueThreshold = 0; return; }
+    const values = clientRows.map(r => r.pedidosValor).filter(v => v != null && v > 0).sort((a, b) => a - b);
+    if (!values.length){ vipValueThreshold = 0; return; }
+    const idx = Math.min(values.length - 1, Math.floor(values.length * VIP_VALUE_PERCENTILE));
+    vipValueThreshold = values[idx];
+  }
+  function isVipSumindo(c){
+    if (!ordersLoaded || !vipValueThreshold) return false;
+    const dias = diasNumber(c.dias);
+    return dias != null && dias >= VIP_DIAS_THRESHOLD && (c.pedidosValor || 0) >= vipValueThreshold;
+  }
+
   let activeUFs = new Set(); // estados marcados; vazio = nenhuma restrição de estado
   let ufFilterInvert = false; // false = mostra só os estados marcados; true = mostra todos, exceto os marcados
   let selectedClientIds = new Set(); // clientes marcados na tabela, para o botão "Copiar selecionados" — não é resetado por filtro/ordenação, só por novo upload/remoção
+
+  // --- Histórico de pedidos (planilha separada, opcional) ---------------------------
+  // Cruza a planilha "CONTROLE PEDIDOS" (aba COMERCIAL, com um pedido por linha e o
+  // código do cliente; aba B.D. CLIENTES, que traduz esse código pra CNPJ) com os
+  // clientes já carregados, casando pelo CNPJ. Regras confirmadas com o usuário:
+  // só conta pedido com CONTABILIZAR?="SIM", e o valor somado é o de "ENTRADA R$".
+  // Não fixamos o ano — o "período" é sempre o que a planilha de pedidos trouxer.
+  let ordersLoaded = false;
+  let ordersFileNameLoaded = '';
+  let orderStatsByCnpj = new Map(); // cnpj normalizado (só dígitos) -> { count, total }
+  let ordersUnmatchedCount = 0; // pedidos válidos cujo código não bateu com nenhuma linha da B.D. CLIENTES
+  let ordersNoCnpjCount = 0; // código bateu na B.D. CLIENTES, mas sem CNPJ preenchido
+
+  function normalizeCnpj(v){
+    if (v === null || v === undefined) return '';
+    return String(v).replace(/\D/g, '');
+  }
+
+  // Mensagem de exportação (.csv) muda conforme a planilha de pedidos estar carregada
+  // ou não — só pra deixar claro quais colunas extras vão sair no arquivo.
+  function refreshExportInfo(){
+    exportInfo.innerHTML = ordersLoaded
+      ? '<strong>Exportação:</strong> com uma planilha carregada, o botão baixa um .csv (separado por ";", com acentuação para abrir certo no Excel) com um cliente por linha e TODAS as colunas da planilha original, na mesma ordem — mais quatro colunas no final, Pedidos, Valor pedidos, Círculo e Distância (km).'
+      : '<strong>Exportação:</strong> com uma planilha carregada, o botão baixa um .csv (separado por ";", com acentuação para abrir certo no Excel) com um cliente por linha e TODAS as colunas da planilha original, na mesma ordem — mais duas colunas no final, Círculo e Distância (km).';
+  }
+
+  // Acha, em qualquer aba/posição, a primeira que tiver todas as colunas pedidas no
+  // cabeçalho (varrendo as primeiras linhas, igual ao parseWorkbook de clientes acima,
+  // já que essas planilhas sempre têm um bloco de título antes da tabela de verdade).
+  function findHeaderedSheet(wb, requiredCols){
+    for (const sheetName of wb.SheetNames){
+      const sheet = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header:1, raw:false, defval:null });
+      for (let i = 0; i < Math.min(rows.length, 40); i++){
+        const row = rows[i];
+        if (!row) continue;
+        const norm = row.map(h => (h === null || h === undefined) ? h : String(h).trim());
+        if (requiredCols.every(rc => norm.includes(rc))){
+          const idx = {};
+          norm.forEach((h, ci) => { if (h) idx[h] = ci; });
+          return { rows, headerIdx: i, idx };
+        }
+      }
+    }
+    return null;
+  }
+
+  // As colunas de valor (R$) dessa planilha específica de pedidos vêm formatadas como
+  // "R$ 15,326.37" (vírgula separando milhar, ponto separando decimal — formato dos EUA,
+  // diferente do "1.234,56" usado na planilha de clientes) — por isso não dá pra reusar
+  // valorNumber() aqui; essa função detecta qual separador é o decimal olhando qual dos
+  // dois (vírgula/ponto) aparece por último no texto.
+  function orderMoneyNumber(v){
+    if (v === null || v === undefined || v === '') return null;
+    let s = String(v).trim().replace(/[^0-9,.\-]/g, '');
+    if (!s) return null;
+    const lastComma = s.lastIndexOf(',');
+    const lastDot = s.lastIndexOf('.');
+    if (lastComma !== -1 && lastDot !== -1){
+      s = (lastDot > lastComma) ? s.replace(/,/g, '') : s.replace(/\./g, '').replace(',', '.');
+    } else if (lastComma !== -1){
+      s = s.replace(',', '.');
+    }
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // Datas em COMERCIAL vêm como texto no formato dos EUA ("9/3/26", "11/17/25") — essa
+  // função converte pra um Date de verdade (pra poder ordenar do pedido mais recente pro
+  // mais antigo); sem isso não dá pra saber qual pedido é o mais novo de cada cliente.
+  function parseOrderDate(v){
+    if (!v) return null;
+    const m = String(v).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (!m) return null;
+    let mm = parseInt(m[1], 10), dd = parseInt(m[2], 10), yy = parseInt(m[3], 10);
+    if (yy < 100) yy += 2000;
+    const d = new Date(yy, mm - 1, dd);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function parseOrdersWorkbook(wb){
+    const com = findHeaderedSheet(wb, ['CODIGO', 'CONTABILIZAR?', 'ENTRADA R$']);
+    const bd = findHeaderedSheet(wb, ['CÓDIGO', 'CNPJ']);
+    if (!com || !bd) throw new Error('Abas de pedidos (COMERCIAL) / clientes (B.D. CLIENTES) não encontradas');
+
+    const codeToCnpj = new Map();
+    for (let r = bd.headerIdx + 1; r < bd.rows.length; r++){
+      const row = bd.rows[r];
+      if (!row) continue;
+      const code = row[bd.idx['CÓDIGO']];
+      const cnpj = row[bd.idx['CNPJ']];
+      if (code === null || code === undefined || code === '') continue;
+      if (!cnpj) continue;
+      codeToCnpj.set(String(code).trim(), String(cnpj).trim());
+    }
+
+    const iData = com.idx['DATA ENTRADA'];
+    const iStatus = com.idx['STATUS'];
+    const iVendedor = com.idx['VENDEDOR'];
+    const byCnpj = new Map();
+    let validOrders = 0, unmatched = 0, noCnpj = 0;
+    for (let r = com.headerIdx + 1; r < com.rows.length; r++){
+      const row = com.rows[r];
+      if (!row || row.every(v => v === null || v === '')) continue;
+      const contab = row[com.idx['CONTABILIZAR?']];
+      if (!contab || String(contab).trim().toUpperCase() !== 'SIM') continue;
+      const code = row[com.idx['CODIGO']];
+      if (code === null || code === undefined || code === '') continue;
+      const cnpj = codeToCnpj.get(String(code).trim());
+      if (!cnpj){ unmatched++; continue; }
+      const cnpjKey = normalizeCnpj(cnpj);
+      if (!cnpjKey){ noCnpj++; continue; }
+      const valor = orderMoneyNumber(row[com.idx['ENTRADA R$']]) || 0;
+      const date = iData !== undefined ? parseOrderDate(row[iData]) : null;
+      const status = (iStatus !== undefined && row[iStatus]) ? String(row[iStatus]).trim() : '';
+      const vendedor = (iVendedor !== undefined && row[iVendedor]) ? String(row[iVendedor]).trim() : '';
+      validOrders++;
+      let agg = byCnpj.get(cnpjKey);
+      if (!agg){ agg = { count: 0, total: 0, orders: [] }; byCnpj.set(cnpjKey, agg); }
+      agg.count++;
+      agg.total += valor;
+      agg.orders.push({ date, valor, status, vendedor });
+    }
+    // pedido mais recente primeiro em cada cliente; sem data conhecida vai pro final
+    byCnpj.forEach(agg => {
+      agg.orders.sort((a, b) => {
+        if (a.date && b.date) return b.date - a.date;
+        if (a.date) return -1;
+        if (b.date) return 1;
+        return 0;
+      });
+    });
+    return { byCnpj, validOrders, unmatched, noCnpj };
+  }
+
+  // --- Resumo de pedidos de um cliente (modal) ---------------------------------------
+  // Clicar no NOME do cliente na tabela (quando a planilha de pedidos está carregada)
+  // abre esse resumo, sem disparar o foco no mapa que o resto da linha continua fazendo.
+  const ORDER_MODAL_LIST_CAP = 30;
+  function openOrderSummaryModal(clientId){
+    const c = clientById(clientId);
+    if (!c || !ordersLoaded) return;
+    const key = normalizeCnpj(c.cnpj);
+    const agg = key ? orderStatsByCnpj.get(key) : null;
+    orderModalTitle.textContent = c.razao || c.nome || '(sem nome)';
+    orderModalCnpj.innerHTML = `${c.cnpj || 'CNPJ não informado'}${isVipSumindo(c) ? `<br><span class="orderModalVipTag">⚠ Cliente importante sumindo</span>` : ''}`;
+    if (!agg || !agg.count){
+      orderModalStatsEl.innerHTML = '';
+      orderModalListWrap.innerHTML = '<div class="orderModalEmpty">Nenhum pedido encontrado para esse CNPJ na planilha de pedidos carregada.</div>';
+    } else {
+      const ticketMedio = agg.total / agg.count;
+      const maisRecente = agg.orders.find(o => o.date);
+      orderModalStatsEl.innerHTML = `
+        <div class="stat"><div class="n">${agg.count.toLocaleString('pt-BR')}</div><div class="l">pedidos</div></div>
+        <div class="stat"><div class="n">${agg.total.toLocaleString('pt-BR', { style:'currency', currency:'BRL' })}</div><div class="l">valor total</div></div>
+        <div class="stat"><div class="n">${ticketMedio.toLocaleString('pt-BR', { style:'currency', currency:'BRL' })}</div><div class="l">ticket médio</div></div>
+        ${maisRecente ? `<div class="stat"><div class="n">${maisRecente.date.toLocaleDateString('pt-BR')}</div><div class="l">pedido mais recente</div></div>` : ''}
+      `;
+      const shown = agg.orders.slice(0, ORDER_MODAL_LIST_CAP);
+      const rowsHtml = shown.map(o => `
+        <tr>
+          <td>${o.date ? o.date.toLocaleDateString('pt-BR') : '—'}</td>
+          <td>${o.status || '—'}</td>
+          <td class="num">${o.valor.toLocaleString('pt-BR', { style:'currency', currency:'BRL' })}</td>
+        </tr>`).join('');
+      orderModalListWrap.innerHTML = `
+        <table>
+          <thead><tr><th>Data</th><th>Status</th><th class="num">Valor</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+        ${agg.orders.length > ORDER_MODAL_LIST_CAP ? `<div class="orderModalMore">+${(agg.orders.length - ORDER_MODAL_LIST_CAP).toLocaleString('pt-BR')} pedido(s) mais antigo(s) não listado(s) aqui — os totais acima já contam com todos.</div>` : ''}
+      `;
+    }
+    orderModalOverlay.hidden = false;
+  }
+  function closeOrderSummaryModal(){
+    orderModalOverlay.hidden = true;
+  }
+  window.__showOrderSummary = openOrderSummaryModal;
+  orderModalCloseBtn.addEventListener('click', closeOrderSummaryModal);
+  orderModalOverlay.addEventListener('click', (e) => { if (e.target === orderModalOverlay) closeOrderSummaryModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !orderModalOverlay.hidden) closeOrderSummaryModal(); });
+
+  // Aplica (ou limpa) os totais de pedidos em cada cliente já carregado, casando pelo
+  // CNPJ. Roda de novo sempre que a planilha de clientes ou a de pedidos muda, pra que
+  // os dois arquivos possam ser trocados/atualizados de forma independente.
+  function applyOrderStatsToClients(){
+    clientRows.forEach(c => {
+      if (!ordersLoaded){
+        c.pedidosCount = null;
+        c.pedidosValor = null;
+        return;
+      }
+      const key = normalizeCnpj(c.cnpj);
+      const agg = key ? orderStatsByCnpj.get(key) : null;
+      c.pedidosCount = agg ? agg.count : 0;
+      c.pedidosValor = agg ? agg.total : 0;
+    });
+  }
+
+  ordersFile.addEventListener('change', () => {
+    const file = ordersFile.files && ordersFile.files[0];
+    if (file) loadOrdersFile(file);
+  });
+
+  function loadOrdersFile(file){
+    if (typeof XLSX === 'undefined'){
+      ordersStatusMsg.classList.add('bad');
+      ordersStatusMsg.textContent = 'Não foi possível carregar o leitor de planilhas (é preciso internet, liberando cdnjs.cloudflare.com).';
+      return;
+    }
+    ordersStatusMsg.classList.remove('bad');
+    ordersStatusMsg.textContent = 'Lendo planilha de pedidos…';
+    const reader = new FileReader();
+    reader.onerror = () => {
+      ordersStatusMsg.classList.add('bad');
+      ordersStatusMsg.textContent = 'Não foi possível ler o arquivo.';
+    };
+    reader.onload = (e) => {
+      try{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type:'array' });
+        const parsed = parseOrdersWorkbook(wb);
+        applyParsedOrders(parsed, file.name);
+      } catch (err){
+        ordersStatusMsg.classList.add('bad');
+        ordersStatusMsg.textContent = 'Não consegui entender essa planilha. Confirme se ela tem as abas COMERCIAL (com CODIGO, CONTABILIZAR? e ENTRADA R$) e B.D. CLIENTES (com CÓDIGO e CNPJ).';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function applyParsedOrders(parsed, fileName){
+    orderStatsByCnpj = parsed.byCnpj;
+    ordersUnmatchedCount = parsed.unmatched;
+    ordersNoCnpjCount = parsed.noCnpj;
+    ordersLoaded = true;
+    ordersFileNameLoaded = fileName;
+    removeOrdersBtn.hidden = false;
+    applyOrderStatsToClients();
+    recomputeVipThreshold();
+    const parts = [`${parsed.validOrders.toLocaleString('pt-BR')} pedido(s) válido(s) de "${fileName}" cruzados por CNPJ.`];
+    if (parsed.unmatched) parts.push(`${parsed.unmatched.toLocaleString('pt-BR')} pedido(s) com código sem cliente correspondente na B.D. CLIENTES (não entraram na soma).`);
+    ordersStatusMsg.classList.remove('bad');
+    ordersStatusMsg.textContent = parts.join(' ');
+    renderClientSummary();
+    renderExtraFilters();
+    refreshExportInfo();
+    setupResultsTableHead();
+    recompute();
+    renderCitiesTab();
+    renderRepTab();
+  }
+
+  removeOrdersBtn.addEventListener('click', () => {
+    ordersLoaded = false;
+    orderStatsByCnpj = new Map();
+    ordersUnmatchedCount = 0;
+    ordersNoCnpjCount = 0;
+    ordersFileNameLoaded = '';
+    ordersFile.value = '';
+    removeOrdersBtn.hidden = true;
+    ordersStatusMsg.textContent = '';
+    ordersStatusMsg.classList.remove('bad');
+    filterOnlyVip = false;
+    vipValueThreshold = 0;
+    applyOrderStatsToClients();
+    renderClientSummary();
+    renderExtraFilters();
+    refreshExportInfo();
+    setupResultsTableHead();
+    recompute();
+    renderCitiesTab();
+    renderRepTab();
+  });
 
   xlsxFile.addEventListener('change', () => {
     const file = xlsxFile.files && xlsxFile.files[0];
@@ -1084,9 +1475,14 @@
     filterOnlyTag = false;
     filterNoTag = false;
     filterDiasFaixa = false;
+    filterOnlyVip = false;
     selectedClientIds = new Set();
     copySelectedBtn.hidden = false;
     updateCopySelectedBtn();
+    // se a planilha de pedidos já estava carregada, refaz o cruzamento por CNPJ com a
+    // nova lista de clientes; se não estava, apenas garante que os campos existam (null)
+    applyOrderStatsToClients();
+    recomputeVipThreshold();
 
     removeFileBtn.hidden = false;
     tabBar.hidden = false;
@@ -1094,7 +1490,8 @@
     clientStatusMsg.textContent = `${clientRows.length.toLocaleString('pt-BR')} cliente(s) carregado(s) de "${fileName}".`;
     downloadBtnLabel.textContent = 'Baixar clientes .csv';
     downloadBtn.title = 'Salvar os clientes dentro do raio em .csv';
-    exportInfo.innerHTML = '<strong>Exportação:</strong> com uma planilha carregada, o botão baixa um .csv (separado por ";", com acentuação para abrir certo no Excel) com um cliente por linha e TODAS as colunas da planilha original, na mesma ordem — mais duas colunas no final, Círculo e Distância (km).';
+    refreshExportInfo();
+    ordersFileBlock.hidden = false;
 
     clearClientSearch();
     clientSearchRow.hidden = false;
@@ -1129,6 +1526,8 @@
     filterOnlyTag = false;
     filterNoTag = false;
     filterDiasFaixa = false;
+    filterOnlyVip = false;
+    vipValueThreshold = 0;
     selectedClientIds = new Set();
     copySelectedBtn.hidden = true;
     copyStatus.textContent = '';
@@ -1148,6 +1547,17 @@
     heatmapToggleRow.hidden = true;
     removeFileBtn.hidden = true;
     tabBar.hidden = true;
+    // sem clientes carregados, o histórico de pedidos não tem o que cruzar — some junto
+    ordersLoaded = false;
+    orderStatsByCnpj = new Map();
+    ordersUnmatchedCount = 0;
+    ordersNoCnpjCount = 0;
+    ordersFileNameLoaded = '';
+    ordersFile.value = '';
+    ordersFileBlock.hidden = true;
+    removeOrdersBtn.hidden = true;
+    ordersStatusMsg.textContent = '';
+    ordersStatusMsg.classList.remove('bad');
     downloadBtnLabel.textContent = 'Baixar .txt';
     downloadBtn.title = 'Salvar em .txt, no formato Cidade-Estado';
     exportInfo.innerHTML = '<strong>Exportação:</strong> o .txt sai no formato "Cidade-Estado" em cada linha (ex.: Porto Alegre-RS) — pensado justamente para quando os círculos caem em estados diferentes, e para ser fácil de cortar o "-UF" no final se um dia precisar só do nome da cidade.';
@@ -1163,12 +1573,20 @@
     const cidades = new Set(clientRows.map(r => normStr(r.cidade) + '|' + r.uf)).size;
     const estados = new Set(clientRows.map(r => r.uf)).size;
     const naoLoc = clientRows.filter(r => !r.matched).length;
+    const pedidosStat = ordersLoaded
+      ? `<div class="stat"><div class="n">${clientRows.filter(r => r.pedidosCount > 0).length.toLocaleString('pt-BR')}</div><div class="l">com pedido na planilha de pedidos</div></div>`
+      : '';
+    const vipStat = ordersLoaded
+      ? `<div class="stat"><div class="n" style="color:#9c2963">${clientRows.filter(r => isVipSumindo(r)).length.toLocaleString('pt-BR')}</div><div class="l">clientes importantes sumindo</div></div>`
+      : '';
     clientSummary.hidden = false;
     clientSummary.innerHTML = `
       <div class="stat accent"><div class="n">${total.toLocaleString('pt-BR')}</div><div class="l">clientes carregados</div></div>
       <div class="stat"><div class="n">${cidades.toLocaleString('pt-BR')}</div><div class="l">cidades diferentes</div></div>
       <div class="stat"><div class="n">${estados}</div><div class="l">estados (UF)</div></div>
       <div class="stat"><div class="n">${naoLoc.toLocaleString('pt-BR')}</div><div class="l">sem cidade reconhecida</div></div>
+      ${pedidosStat}
+      ${vipStat}
     `;
   }
 
@@ -1312,7 +1730,8 @@
       (!filterNoPend || !isPendenciaAtiva(r.devedores)) &&
       (!filterOnlyTag || hasTag(r.tags)) &&
       (!filterNoTag || !hasTag(r.tags)) &&
-      (!filterDiasFaixa || isQuaseInativoDias(r.dias))
+      (!filterDiasFaixa || isQuaseInativoDias(r.dias)) &&
+      (!filterOnlyVip || isVipSumindo(r))
     );
   }
 
@@ -1343,6 +1762,16 @@
     filterNoPendPill.classList.toggle('off', !filterNoPend);
     filterTagPill.classList.toggle('off', !filterOnlyTag);
     filterNoTagPill.classList.toggle('off', !filterNoTag);
+
+    filterVipPill.hidden = !ordersLoaded;
+    if (ordersLoaded){
+      const comVip = clientRows.filter(r => isVipSumindo(r)).length;
+      const valorTxt = vipValueThreshold ? vipValueThreshold.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '';
+      filterVipLabel.textContent = `Cliente importante sumindo (${comVip.toLocaleString('pt-BR')})`;
+      filterVipPill.title = `Cliente com valor total ≥ ${valorTxt} no histórico de pedidos (top 25% de quem comprou) e ${VIP_DIAS_THRESHOLD}+ dias sem comprar.`;
+      filterVipChk.checked = filterOnlyVip;
+      filterVipPill.classList.toggle('off', !filterOnlyVip);
+    }
   }
 
   filterRedeChk.addEventListener('change', () => {
@@ -1387,6 +1816,13 @@
     renderCitiesTab();
     renderRepTab();
   });
+  filterVipChk.addEventListener('change', () => {
+    filterOnlyVip = filterVipChk.checked;
+    filterVipPill.classList.toggle('off', !filterOnlyVip);
+    recompute();
+    renderCitiesTab();
+    renderRepTab();
+  });
 
   function buildCityAgg(clients){
     const map = new Map();
@@ -1422,6 +1858,7 @@
     const diasN = diasNumber(c.dias);
     const valorN = valorNumber(c.valorUltimo);
     const lines = [`*${c.razao || c.nome || '(sem nome)'}*`];
+    if (isVipSumindo(c)) lines.push(`⚠ Cliente importante sumindo (valor alto no histórico, ${VIP_DIAS_THRESHOLD}+ dias sem comprar)`);
     if (c.cnpj) lines.push(`CNPJ: ${c.cnpj}`);
     if (c.cidade) lines.push(`Cidade: ${c.cidade}${c.uf ? ' - ' + c.uf : ''}`);
     lines.push(`Situação: ${s.label}`);
@@ -1431,6 +1868,10 @@
     else if (c.dias) lines.push(`Dias sem comprar: ${c.dias}`);
     if (valorN != null) lines.push(`Valor do último pedido: ${valorN.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
     else if (c.valorUltimo) lines.push(`Valor do último pedido: ${c.valorUltimo}`);
+    if (ordersLoaded && c.pedidosCount != null){
+      const valTxt = (c.pedidosValor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      lines.push(`Pedidos (planilha de pedidos): ${c.pedidosCount.toLocaleString('pt-BR')} (total ${valTxt})`);
+    }
     if (isPendenciaAtiva(c.devedores)) lines.push(`Pendência: ${c.devedores}`);
     if (c.telefone) lines.push(`Telefone: ${c.telefone}`);
     return lines.join('\n');
@@ -1525,9 +1966,15 @@
     const rows = shown.map(c => {
       const s = STATUS_BY_KEY[c.statusKey] || STATUS_FALLBACK;
       const diasN = diasNumber(c.dias);
-      const extras = [c.vendedor, diasN != null ? `${diasN.toLocaleString('pt-BR')} dias sem comprar` : null].filter(Boolean).join(' · ');
+      const pedidosTxt = (ordersLoaded && c.pedidosCount != null)
+        ? `${c.pedidosCount.toLocaleString('pt-BR')} pedido(s)${c.pedidosCount ? ' · ' + (c.pedidosValor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : ''}`
+        : null;
+      const extras = [c.vendedor, diasN != null ? `${diasN.toLocaleString('pt-BR')} dias sem comprar` : null, pedidosTxt].filter(Boolean).join(' · ');
       const tagBadge = hasTag(c.tags)
         ? `<span class="badge" style="background:${hexToRgba('#8a4a7a',0.14)};color:#8a4a7a;align-self:flex-start;margin-top:1px">${c.tags}</span>`
+        : '';
+      const vipBadge = isVipSumindo(c)
+        ? `<span class="badge" style="background:${hexToRgba('#9c2963',0.14)};color:#9c2963;align-self:flex-start;margin-top:1px" title="Valor alto no histórico de pedidos e ${VIP_DIAS_THRESHOLD}+ dias sem comprar">⚠ importante sumindo</span>`
         : '';
       return `
         <div class="popupClientRow">
@@ -1535,6 +1982,7 @@
           <div class="popupClientInfo">
             <b>${c.razao || c.nome || '(sem nome)'}</b>
             <span class="mono">${c.cnpj || 'CNPJ não informado'}</span>
+            ${vipBadge}
             ${tagBadge}
             ${extras ? `<span class="popupClientExtra">${extras}</span>` : ''}
           </div>
@@ -1608,8 +2056,11 @@
   }
 
   function setupResultsTableHead(){
+    const ordersCols = ordersLoaded
+      ? `<th data-key="pedidos" class="num">Pedidos</th><th data-key="valorPedidos" class="num">Valor pedidos</th>`
+      : '';
     resultsTableHeadRow.innerHTML = clientsLoaded
-      ? `<th class="chkCol"><input type="checkbox" id="selectAllChk" title="Marcar/desmarcar todos os clientes visíveis"></th><th style="width:32px">#</th><th data-key="nome">Cliente</th><th data-key="cnpj">CNPJ</th><th data-key="cidade">Cidade</th><th data-key="situacao">Situação</th><th data-key="vendedor">Representante</th><th data-key="grupo">Grupo/Rede</th><th data-key="pendencia">Pendência</th><th data-key="tags">Tags de cliente</th><th data-key="dias" class="num">Dias sem comprar</th><th data-key="circulo">Círculo</th><th data-key="distancia" class="num">Distância</th><th class="actionCol">Ação</th>`
+      ? `<th class="chkCol"><input type="checkbox" id="selectAllChk" title="Marcar/desmarcar todos os clientes visíveis"></th><th style="width:32px">#</th><th data-key="nome">Cliente</th><th data-key="cnpj">CNPJ</th><th data-key="cidade">Cidade</th><th data-key="situacao">Situação</th><th data-key="vendedor">Representante</th><th data-key="grupo">Grupo/Rede</th><th data-key="pendencia">Pendência</th><th data-key="tags">Tags de cliente</th><th data-key="dias" class="num">Dias sem comprar</th>${ordersCols}<th data-key="circulo">Círculo</th><th data-key="distancia" class="num">Distância</th><th class="actionCol">Ação</th>`
       : `<th style="width:32px">#</th><th data-key="municipio">Município</th><th data-key="circulo">Círculo</th><th data-key="distancia" class="num">Distância</th>`;
     sortState = { key: null, dir: 1 };
     updateSortArrows();
@@ -1647,6 +2098,8 @@
     pendencia: { get: r => r.client.devedores },
     tags: { get: r => r.client.tags },
     dias: { get: r => diasNumber(r.client.dias) },
+    pedidos: { get: r => r.client.pedidosCount },
+    valorPedidos: { get: r => r.client.pedidosValor },
     circulo: { get: r => r.bestCircleId },
     distancia: { get: r => r.bestD },
   };
@@ -2445,11 +2898,19 @@
           ? `<span class="badge" style="background:${hexToRgba('#8a4a7a',0.14)};color:#8a4a7a">${c.tags}</span>`
           : `<span style="color:var(--muted)">—</span>`;
         const checked = selectedClientIds.has(c.id) ? ' checked' : '';
+        const ordersCells = ordersLoaded
+          ? `<td class="mono">${c.pedidosCount != null ? c.pedidosCount.toLocaleString('pt-BR') : '<span style="color:var(--muted)">—</span>'}</td><td class="mono">${c.pedidosValor != null ? c.pedidosValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '<span style="color:var(--muted)">—</span>'}</td>`
+          : '';
+        const nomeCellAttrs = ordersLoaded
+          ? ` class="city clientNameCell clickable" onclick="event.stopPropagation(); __showOrderSummary(${c.id})" title="Ver resumo dos pedidos deste cliente"`
+          : ` class="city"`;
+        const isVip = isVipSumindo(c);
+        const vipBadge = isVip ? `<span class="vipBadge" title="Valor alto no histórico de pedidos e ${VIP_DIAS_THRESHOLD}+ dias sem comprar">⚠</span>` : '';
         return `
-        <tr onclick="__focusLatLon(${c.lat}, ${c.lon})">
+        <tr class="${isVip ? 'vipRow' : ''}" onclick="__focusLatLon(${c.lat}, ${c.lon})">
           <td class="chkCol" onclick="event.stopPropagation()"><input type="checkbox"${checked} onchange="__toggleClientSelect(${c.id}, this.checked)"></td>
           <td class="rank">${i+1}</td>
-          <td class="city">${c.nome || ''}</td>
+          <td${nomeCellAttrs}>${vipBadge}${c.nome || ''}</td>
           <td class="mono">${c.cnpj || ''}</td>
           <td class="city">${c.cidade || ''}<span class="uf">${c.uf || ''}</span></td>
           <td><span class="badge" style="background:${hexToRgba(st.color,0.14)};color:${st.color}"><span class="dot" style="background:${st.color}"></span>${st.label}</span></td>
@@ -2458,6 +2919,7 @@
           <td>${pendenciaCell}</td>
           <td>${tagCell}</td>
           <td class="mono">${diasCell}</td>
+          ${ordersCells}
           <td class="circleCol"><span class="dot" style="background:${r.bestColor}"></span>${circleTxt}</td>
           <td class="dist">${fmt(r.bestD)} km</td>
           <td class="actionCol" onclick="event.stopPropagation()"><button type="button" class="rowCopyBtn" onclick="__copyClientById(${c.id}, this)">Copiar</button></td>
@@ -2486,14 +2948,16 @@
     }
     if (clientsLoaded){
       // every column exactly as it came from the imported file, in the same order,
-      // plus the two columns this ferramenta calculates (círculo e distância)
+      // plus the columns this ferramenta calcula (pedidos/valor, quando a planilha de
+      // pedidos está carregada, e sempre círculo e distância)
       const fileHeaders = clientRawHeaders.length ? clientRawHeaders : ['Nome','Cidade','Estado','Situação'];
-      const header = fileHeaders.concat(['Círculo', 'Distância (km)']);
+      const header = fileHeaders.concat(ordersLoaded ? ['Pedidos', 'Valor pedidos', 'Círculo', 'Distância (km)'] : ['Círculo', 'Distância (km)']);
       const lines = [header.join(';')];
       for (const r of lastRenderedRows){
         const c = r.client;
         const circleTxt = r.circleIds.size > 1 ? Array.from(r.circleIds).sort((a,b)=>a-b).join(',') : String(r.bestCircleId);
         const vals = fileHeaders.map(h => (c.raw && c.raw[h] != null) ? c.raw[h] : '');
+        if (ordersLoaded) vals.push(c.pedidosCount != null ? c.pedidosCount : '', c.pedidosValor != null ? String(c.pedidosValor).replace('.', ',') : '');
         vals.push(circleTxt, fmt(r.bestD));
         lines.push(vals.map(v => String(v == null ? '' : v).replace(/;/g, ',').replace(/[\r\n]+/g, ' ')).join(';'));
       }
