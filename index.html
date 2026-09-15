@@ -206,8 +206,16 @@
   }
   .circleChip .dot{ width:11px; height:11px; border-radius:50%; flex:none; }
   .circleChip .info{ display:flex; flex-direction:column; gap:1px; }
-  .circleChip .info b{ font-weight:600; }
+  .circleChip .info b{ font-weight:600; display:flex; align-items:center; gap:4px; }
   .circleChip .info span{ color:var(--muted); font-size:11.5px; }
+  .radiusEditInput{
+    width:50px; font:600 12.5px "IBM Plex Mono", monospace; background:var(--surface); border:1px solid var(--border);
+    border-radius:5px; padding:1px 4px; color:var(--text);
+  }
+  .radiusEditInput:focus{ outline:2px solid var(--accent-soft); border-color:var(--accent); }
+  .circleDragHandle{ display:flex; align-items:center; justify-content:center; cursor:grab; }
+  .circleDragHandle span{ display:block; width:14px; height:14px; border-radius:50%; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.4); }
+  .circleDragHandle.leaflet-drag-target, .circleDragHandle:active{ cursor:grabbing; }
   .circleChip button{
     border:none; background:none; color:var(--muted); font-size:16px; line-height:1; cursor:pointer; padding:2px 4px;
     border-radius:5px;
@@ -588,6 +596,7 @@
 
   <footer>
     <p><strong>Metodologia:</strong> distância em linha reta (fórmula de haversine, "como o pássaro voa") do centro de cada círculo até a sede de cada município. Não é distância rodoviária. Quando um município cai em mais de um círculo, a lista mostra o círculo mais próximo e a menor distância. O checkbox "Mostrar quantidade de clientes/municípios em cada círculo" já testa cada círculo sozinho, então quem está dentro de dois círculos que se sobrepõem conta nos dois — por isso a soma dos números de cada círculo pode passar do total único mostrado ali em cima.</p>
+    <p><strong>Editar um círculo já criado:</strong> arraste o ponto central do círculo (a bolinha colorida) para movê-lo para outro lugar do mapa — o raio some junto, em tempo real. Para mudar o tamanho do raio, edite o número "km" direto no card do círculo, na lista abaixo do mapa (ex.: trocar 100 por 50) e aperte Enter ou clique fora; a tabela, o mapa de calor e as contagens são recalculados na hora.</p>
     <p id="exportInfo"><strong>Exportação:</strong> o .txt sai no formato "Cidade-Estado" em cada linha (ex.: Porto Alegre-RS) — pensado justamente para quando os círculos caem em estados diferentes, e para ser fácil de cortar o "-UF" no final se um dia precisar só do nome da cidade.</p>
     <p><strong>Clientes no mapa:</strong> assim que a planilha é carregada, todos os clientes já aparecem no mapa (mesmo sem nenhum círculo criado), um ponto por cidade — colorido pela situação com mais clientes ali e maior conforme a quantidade de clientes, com um popup mostrando o total e a divisão por situação ao clicar. Use os checkboxes de situação, o filtro de representante, os checkboxes de estado (UF) e os checkboxes de rede/grupo e pendência financeira para restringir o que aparece — ótimo para enxergar regiões com concentração de inativos antigos, por exemplo. Nos estados, marcar um ou mais UFs mostra só esses; marcar também "Mostrar todos, exceto os marcados" inverte — os UFs marcados viram os únicos de fora, e todo o resto aparece. Sem nenhum UF marcado, os dois jeitos mostram todo mundo. Marcar "Só com rede/grupo" ou "Só com pendência financeira" restringe a lista a quem tem essa característica; marcar "Remover rede/grupo" ou "Remover pendência financeira" faz o oposto, escondendo quem tem — em todo lugar (mapa, lista de raios e aba de cidades). Marcar os dois de um mesmo par ao mesmo tempo é uma contradição de propósito, então a lista fica vazia. Na coluna de pendência, um valor como "PENDÊNCIAS REGULARIZADAS" não conta como pendência ativa — só entra em "Só com pendência financeira" (e fica de fora em "Remover pendência financeira") quem realmente está com pendência em aberto; na tabela de resultados esse texto aparece em verde para diferenciar de uma pendência ainda aberta, que aparece em vermelho. E se você desmarcar todos os checkboxes de situação, a ferramenta volta a mostrar todo mundo em vez de não mostrar ninguém. A planilha não traz endereço geocodificado, então cada cliente é posicionado na coordenada da sede do seu município (Cidade + Estado) — não no endereço exato.</p>
     <p><strong>Baixar imagem do mapa:</strong> o botão "Baixar imagem" no cabeçalho do mapa gera um .png com o que está na tela (mapa, legenda e a contagem de círculos, se estiver marcada) — bom para colar num relatório ou mandar no WhatsApp. Alguns provedores de mapa (no seletor "Provedor do mapa") não deixam captura por uma restrição de segurança do navegador; se aparecer um aviso de erro, é só trocar de provedor ali e tentar de novo.</p>
@@ -1336,10 +1345,16 @@
   function clientById(id){
     return clientRows.find(c => c.id === id);
   }
+  function valorNumber(v){
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(String(v).replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  }
   function clientCopyBlock(c){
     if (!c) return '';
     const s = STATUS_BY_KEY[c.statusKey] || STATUS_FALLBACK;
     const diasN = diasNumber(c.dias);
+    const valorN = valorNumber(c.valorUltimo);
     const lines = [`*${c.razao || c.nome || '(sem nome)'}*`];
     if (c.cnpj) lines.push(`CNPJ: ${c.cnpj}`);
     if (c.cidade) lines.push(`Cidade: ${c.cidade}${c.uf ? ' - ' + c.uf : ''}`);
@@ -1347,6 +1362,8 @@
     if (c.vendedor) lines.push(`Representante: ${c.vendedor}`);
     if (diasN != null) lines.push(`Dias sem comprar: ${diasN.toLocaleString('pt-BR')}`);
     else if (c.dias) lines.push(`Dias sem comprar: ${c.dias}`);
+    if (valorN != null) lines.push(`Valor do último pedido: ${valorN.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
+    else if (c.valorUltimo) lines.push(`Valor do último pedido: ${c.valorUltimo}`);
     if (isPendenciaAtiva(c.devedores)) lines.push(`Pendência: ${c.devedores}`);
     if (c.telefone) lines.push(`Telefone: ${c.telefone}`);
     return lines.join('\n');
@@ -2002,6 +2019,30 @@
   }
   window.__removeCircle = removeCircle;
 
+  // Editar o raio de um círculo já criado (campo numérico no chip da lista de círculos).
+  function setCircleRadius(id, value){
+    const c = circles.find(c => c.id === id);
+    if (!c) return;
+    const km = Math.max(1, Math.min(2000, Math.round(Number(value)) || c.radiusKm));
+    c.radiusKm = km;
+    recompute();
+  }
+  window.__setCircleRadius = setCircleRadius;
+
+  // Arrastar um círculo já criado pra outro lugar do mapa: o ponto central (um L.marker
+  // arrastável, já que L.circle/L.circleMarker não suportam draggable no Leaflet puro)
+  // vai sendo movido pelo próprio Leaflet; a cada passo do arraste (evento "drag")
+  // só reposicionamos o anel tracejado pra acompanhar visualmente, sem recalcular nada —
+  // o recálculo completo (tabela, legendas, mapa de calor etc.) só roda no "dragend".
+  function moveCircle(id, lat, lon){
+    const c = circles.find(c => c.id === id);
+    if (!c) return;
+    c.lat = lat;
+    c.lon = lon;
+    c.label = nearestCityLabel(lat, lon);
+    recompute();
+  }
+
   function clearAll(){
     circles = [];
     recompute();
@@ -2105,7 +2146,7 @@
       <div class="circleChip">
         <span class="dot" style="background:${c.color}"></span>
         <div class="info">
-          <b>Círculo ${c.id} · ${c.radiusKm} km</b>
+          <b>Círculo ${c.id} · <input type="number" class="radiusEditInput" min="1" max="2000" step="1" value="${c.radiusKm}" title="Editar o raio deste círculo" onchange="__setCircleRadius(${c.id}, this.value)"> km</b>
           <span>${c.label || `${c.lat.toFixed(2)}, ${c.lon.toFixed(2)}`}</span>
           ${countHTML}
         </div>
@@ -2169,12 +2210,22 @@
       circleLayerGroup.clearLayers();
       cityLayerGroup.clearLayers();
       for (const c of circles){
-        L.circle([c.lat, c.lon], {
+        const ring = L.circle([c.lat, c.lon], {
           radius: c.radiusKm * 1000, color: c.color, weight: 1.6, fillColor: c.color, fillOpacity: 0.06, dashArray: '4 5'
         }).addTo(circleLayerGroup);
-        L.circleMarker([c.lat, c.lon], {
-          radius: 6, color: c.color, weight: 2, fillColor: c.color, fillOpacity: 0.95
+        // Ponto central arrastável: move o círculo pra outro lugar do mapa. L.circle/
+        // L.circleMarker não têm "draggable" no Leaflet puro, por isso o centro é um
+        // L.marker (ícone customizado do mesmo tamanho/cor do ponto de antes).
+        const handle = L.marker([c.lat, c.lon], {
+          icon: L.divIcon({ className: 'circleDragHandle', html: `<span style="background:${c.color}"></span>`, iconSize: [14, 14], iconAnchor: [7, 7] }),
+          draggable: true,
+          title: 'Arraste para mover o círculo',
         }).bindPopup(`<b>Círculo ${c.id}</b><br><span class="d">raio ${c.radiusKm} km · ${c.label || ''}</span>`).addTo(circleLayerGroup);
+        handle.on('drag', (e) => ring.setLatLng(e.target.getLatLng()));
+        handle.on('dragend', (e) => {
+          const ll = e.target.getLatLng();
+          moveCircle(c.id, ll.lat, ll.lng);
+        });
       }
     }
 
