@@ -435,6 +435,16 @@
         <span class="dot" style="background:#a2402f"></span>
         <span id="filterNoPendLabel">Remover pendência financeira</span>
       </label>
+      <label class="statusPill" id="filterTagPill">
+        <input type="checkbox" id="filterTagChk">
+        <span class="dot" style="background:#8a4a7a"></span>
+        <span id="filterTagLabel">Só com tag de cliente</span>
+      </label>
+      <label class="statusPill" id="filterNoTagPill">
+        <input type="checkbox" id="filterNoTagChk">
+        <span class="dot" style="background:#8a4a7a"></span>
+        <span id="filterNoTagLabel">Remover tag de cliente</span>
+      </label>
     </div>
     <span id="filtersOriginAnchor" hidden></span>
   </div>
@@ -600,7 +610,7 @@
     <p><strong>Metodologia:</strong> distância em linha reta (fórmula de haversine, "como o pássaro voa") do centro de cada círculo até a sede de cada município. Não é distância rodoviária. Quando um município cai em mais de um círculo, a lista mostra o círculo mais próximo e a menor distância. O checkbox "Mostrar quantidade de clientes/municípios em cada círculo" já testa cada círculo sozinho, então quem está dentro de dois círculos que se sobrepõem conta nos dois — por isso a soma dos números de cada círculo pode passar do total único mostrado ali em cima.</p>
     <p><strong>Editar um círculo já criado:</strong> arraste o ponto central do círculo (a bolinha colorida) para movê-lo para outro lugar do mapa — o raio some junto, em tempo real. Para mudar o tamanho do raio, edite o número "km" direto no card do círculo, na lista abaixo do mapa (ex.: trocar 100 por 50) e aperte Enter ou clique fora; a tabela, o mapa de calor e as contagens são recalculados na hora.</p>
     <p id="exportInfo"><strong>Exportação:</strong> o .txt sai no formato "Cidade-Estado" em cada linha (ex.: Porto Alegre-RS) — pensado justamente para quando os círculos caem em estados diferentes, e para ser fácil de cortar o "-UF" no final se um dia precisar só do nome da cidade.</p>
-    <p><strong>Clientes no mapa:</strong> assim que a planilha é carregada, todos os clientes já aparecem no mapa (mesmo sem nenhum círculo criado), um ponto por cidade — colorido pela situação com mais clientes ali e maior conforme a quantidade de clientes, com um popup mostrando o total e a divisão por situação ao clicar. Use os checkboxes de situação, o filtro de representante, os checkboxes de estado (UF) e os checkboxes de rede/grupo e pendência financeira para restringir o que aparece — ótimo para enxergar regiões com concentração de inativos antigos, por exemplo. Ao lado do filtro "Representante" (que mostra só quem é daquele representante) tem o "Ocultar representante" — o oposto: escolha um nome ali e a lista (mapa, tabela, mapa de calor, aba de cidades e de representantes) esconde quem já está na carteira dele, útil pra ver só quem ainda não foi repassado pra ninguém específico antes de mandar a lista pra um representante. Nos estados, marcar um ou mais UFs mostra só esses; marcar também "Mostrar todos, exceto os marcados" inverte — os UFs marcados viram os únicos de fora, e todo o resto aparece. Sem nenhum UF marcado, os dois jeitos mostram todo mundo. Marcar "Só com rede/grupo" ou "Só com pendência financeira" restringe a lista a quem tem essa característica; marcar "Remover rede/grupo" ou "Remover pendência financeira" faz o oposto, escondendo quem tem — em todo lugar (mapa, lista de raios e aba de cidades). Marcar os dois de um mesmo par ao mesmo tempo é uma contradição de propósito, então a lista fica vazia. Na coluna de pendência, um valor como "PENDÊNCIAS REGULARIZADAS" não conta como pendência ativa — só entra em "Só com pendência financeira" (e fica de fora em "Remover pendência financeira") quem realmente está com pendência em aberto; na tabela de resultados esse texto aparece em verde para diferenciar de uma pendência ainda aberta, que aparece em vermelho. E se você desmarcar todos os checkboxes de situação, a ferramenta volta a mostrar todo mundo em vez de não mostrar ninguém. A planilha não traz endereço geocodificado, então cada cliente é posicionado na coordenada da sede do seu município (Cidade + Estado) — não no endereço exato.</p>
+    <p><strong>Clientes no mapa:</strong> assim que a planilha é carregada, todos os clientes já aparecem no mapa (mesmo sem nenhum círculo criado), um ponto por cidade — colorido pela situação com mais clientes ali e maior conforme a quantidade de clientes, com um popup mostrando o total e a divisão por situação ao clicar. Use os checkboxes de situação, o filtro de representante, os checkboxes de estado (UF) e os checkboxes de rede/grupo e pendência financeira para restringir o que aparece — ótimo para enxergar regiões com concentração de inativos antigos, por exemplo. Ao lado do filtro "Representante" (que mostra só quem é daquele representante) tem o "Ocultar representante" — o oposto: escolha um nome ali e a lista (mapa, tabela, mapa de calor, aba de cidades e de representantes) esconde quem já está na carteira dele, útil pra ver só quem ainda não foi repassado pra ninguém específico antes de mandar a lista pra um representante. Nos estados, marcar um ou mais UFs mostra só esses; marcar também "Mostrar todos, exceto os marcados" inverte — os UFs marcados viram os únicos de fora, e todo o resto aparece. Sem nenhum UF marcado, os dois jeitos mostram todo mundo. Marcar "Só com rede/grupo", "Só com pendência financeira" ou "Só com tag de cliente" restringe a lista a quem tem essa característica; marcar "Remover rede/grupo", "Remover pendência financeira" ou "Remover tag de cliente" faz o oposto, escondendo quem tem — em todo lugar (mapa, lista de raios e aba de cidades). Marcar os dois de um mesmo par ao mesmo tempo é uma contradição de propósito, então a lista fica vazia. A coluna "Tags de cliente" (quando a planilha traz essa informação) também aparece na tabela de resultados, no popup de cada cliente no mapa e no texto copiado pelo botão "Copiar" — é considerado "com tag" qualquer cliente com algo preenchido ali, seja qual for o texto. Na coluna de pendência, um valor como "PENDÊNCIAS REGULARIZADAS" não conta como pendência ativa — só entra em "Só com pendência financeira" (e fica de fora em "Remover pendência financeira") quem realmente está com pendência em aberto; na tabela de resultados esse texto aparece em verde para diferenciar de uma pendência ainda aberta, que aparece em vermelho. E se você desmarcar todos os checkboxes de situação, a ferramenta volta a mostrar todo mundo em vez de não mostrar ninguém. A planilha não traz endereço geocodificado, então cada cliente é posicionado na coordenada da sede do seu município (Cidade + Estado) — não no endereço exato.</p>
     <p><strong>Baixar imagem do mapa:</strong> o botão "Baixar imagem" no cabeçalho do mapa gera um .png com o que está na tela (mapa, legenda e a contagem de círculos, se estiver marcada) — bom para colar num relatório ou mandar no WhatsApp. Alguns provedores de mapa (no seletor "Provedor do mapa") não deixam captura por uma restrição de segurança do navegador; se aparecer um aviso de erro, é só trocar de provedor ali e tentar de novo.</p>
     <p><strong>Popup com a lista de clientes:</strong> clicar num ponto do mapa (seja no ponto geral da cidade ou no marcador dentro de um círculo) abre, além do resumo por situação, a lista de clientes daquela cidade — razão social, CNPJ, a situação de cada um (com a mesma cor de sempre) e, quando existem, o representante e os dias sem comprar. Em cidades com muitos clientes a lista é cortada (a partir de 25) com um aviso apontando pra tabela completa logo abaixo do mapa, que já tem a coluna de CNPJ.</p>
     <p><strong>Ordenar a tabela:</strong> clique em qualquer cabeçalho da tabela "Clientes/Municípios encontrados" para ordenar por essa coluna (uma seta indica a direção); clique de novo no mesmo cabeçalho para inverter. Com clientes, a coluna "Dias sem comprar" (vinda direto da planilha) é útil pra ordenar do que está há mais tempo parado pra cá.</p>
@@ -729,6 +739,12 @@
   const filterNoPendChk = document.getElementById('filterNoPendChk');
   const filterNoPendPill = document.getElementById('filterNoPendPill');
   const filterNoPendLabel = document.getElementById('filterNoPendLabel');
+  const filterTagChk = document.getElementById('filterTagChk');
+  const filterTagPill = document.getElementById('filterTagPill');
+  const filterTagLabel = document.getElementById('filterTagLabel');
+  const filterNoTagChk = document.getElementById('filterNoTagChk');
+  const filterNoTagPill = document.getElementById('filterNoTagPill');
+  const filterNoTagLabel = document.getElementById('filterNoTagLabel');
   const tabBar = document.getElementById('tabBar');
   const tabBtnMapa = document.getElementById('tabBtnMapa');
   const tabBtnCidades = document.getElementById('tabBtnCidades');
@@ -929,7 +945,7 @@
     situacao:'Situação', telefone:'Telefone', vendedor:'Vendedor do último pedido',
     dias:'Dias sem comprar', dataUltimo:'Data do último pedido', valorUltimo:'Valor do último pedido',
     cep:'CEP', bairro:'Bairro', endereco:'Endereço', cnpj:'CNPJ/CPF',
-    grupo:'GRUPO', devedores:'Devedores',
+    grupo:'GRUPO', devedores:'Devedores', tags:'Tags de cliente',
   };
 
   let clientRows = [];
@@ -942,6 +958,9 @@
   let filterOnlyPend = false; // true = mostra so quem tem pendencia financeira (checkbox marcado)
   let filterNoRede = false; // true = remove (esconde) quem tem rede/grupo
   let filterNoPend = false; // true = remove (esconde) quem tem pendencia financeira
+  let filterOnlyTag = false; // true = mostra só quem tem algo preenchido em "Tags de cliente"
+  let filterNoTag = false; // true = remove (esconde) quem tem algo preenchido em "Tags de cliente"
+  function hasTag(v){ return v !== null && v !== undefined && String(v).trim() !== ''; }
   // "Quase inativo (60-90 dias sem comprar)": filtro extra baseado só na coluna "Dias sem
   // comprar" da planilha, independente da Situação que ela já traz — não reclassifica
   // ninguém nem muda a cor/badge de ninguém, só restringe a lista quando marcado.
@@ -1031,7 +1050,7 @@
           situacaoRaw: get('situacao'), telefone: get('telefone'), vendedor: get('vendedor'),
           dias: get('dias'), dataUltimo: get('dataUltimo'), valorUltimo: get('valorUltimo'),
           cep: get('cep'), bairro: get('bairro'), endereco: get('endereco'), cnpj: get('cnpj'),
-          grupo: get('grupo'), devedores: get('devedores'),
+          grupo: get('grupo'), devedores: get('devedores'), tags: get('tags'),
           raw,
         });
       }
@@ -1062,6 +1081,8 @@
     filterOnlyPend = false;
     filterNoRede = false;
     filterNoPend = false;
+    filterOnlyTag = false;
+    filterNoTag = false;
     filterDiasFaixa = false;
     selectedClientIds = new Set();
     copySelectedBtn.hidden = false;
@@ -1105,6 +1126,8 @@
     filterOnlyPend = false;
     filterNoRede = false;
     filterNoPend = false;
+    filterOnlyTag = false;
+    filterNoTag = false;
     filterDiasFaixa = false;
     selectedClientIds = new Set();
     copySelectedBtn.hidden = true;
@@ -1287,6 +1310,8 @@
       (!filterNoRede || !r.grupo) &&
       (!filterOnlyPend || isPendenciaAtiva(r.devedores)) &&
       (!filterNoPend || !isPendenciaAtiva(r.devedores)) &&
+      (!filterOnlyTag || hasTag(r.tags)) &&
+      (!filterNoTag || !hasTag(r.tags)) &&
       (!filterDiasFaixa || isQuaseInativoDias(r.dias))
     );
   }
@@ -1298,19 +1323,26 @@
   function renderExtraFilters(){
     const comRede = clientRows.filter(r => r.grupo).length;
     const comPend = clientRows.filter(r => isPendenciaAtiva(r.devedores)).length;
+    const comTag = clientRows.filter(r => hasTag(r.tags)).length;
     extraFiltersRow.hidden = false;
     filterRedeLabel.textContent = `Só com rede/grupo (${comRede.toLocaleString('pt-BR')})`;
     filterNoRedeLabel.textContent = `Remover rede/grupo (${comRede.toLocaleString('pt-BR')})`;
     filterPendLabel.textContent = `Só com pendência financeira (${comPend.toLocaleString('pt-BR')})`;
     filterNoPendLabel.textContent = `Remover pendência financeira (${comPend.toLocaleString('pt-BR')})`;
+    filterTagLabel.textContent = `Só com tag de cliente (${comTag.toLocaleString('pt-BR')})`;
+    filterNoTagLabel.textContent = `Remover tag de cliente (${comTag.toLocaleString('pt-BR')})`;
     filterRedeChk.checked = filterOnlyRede;
     filterNoRedeChk.checked = filterNoRede;
     filterPendChk.checked = filterOnlyPend;
     filterNoPendChk.checked = filterNoPend;
+    filterTagChk.checked = filterOnlyTag;
+    filterNoTagChk.checked = filterNoTag;
     filterRedePill.classList.toggle('off', !filterOnlyRede);
     filterNoRedePill.classList.toggle('off', !filterNoRede);
     filterPendPill.classList.toggle('off', !filterOnlyPend);
     filterNoPendPill.classList.toggle('off', !filterNoPend);
+    filterTagPill.classList.toggle('off', !filterOnlyTag);
+    filterNoTagPill.classList.toggle('off', !filterNoTag);
   }
 
   filterRedeChk.addEventListener('change', () => {
@@ -1337,6 +1369,20 @@
   filterNoPendChk.addEventListener('change', () => {
     filterNoPend = filterNoPendChk.checked;
     filterNoPendPill.classList.toggle('off', !filterNoPend);
+    recompute();
+    renderCitiesTab();
+    renderRepTab();
+  });
+  filterTagChk.addEventListener('change', () => {
+    filterOnlyTag = filterTagChk.checked;
+    filterTagPill.classList.toggle('off', !filterOnlyTag);
+    recompute();
+    renderCitiesTab();
+    renderRepTab();
+  });
+  filterNoTagChk.addEventListener('change', () => {
+    filterNoTag = filterNoTagChk.checked;
+    filterNoTagPill.classList.toggle('off', !filterNoTag);
     recompute();
     renderCitiesTab();
     renderRepTab();
@@ -1379,6 +1425,7 @@
     if (c.cnpj) lines.push(`CNPJ: ${c.cnpj}`);
     if (c.cidade) lines.push(`Cidade: ${c.cidade}${c.uf ? ' - ' + c.uf : ''}`);
     lines.push(`Situação: ${s.label}`);
+    if (hasTag(c.tags)) lines.push(`Tag: ${c.tags}`);
     if (c.vendedor) lines.push(`Representante: ${c.vendedor}`);
     if (diasN != null) lines.push(`Dias sem comprar: ${diasN.toLocaleString('pt-BR')}`);
     else if (c.dias) lines.push(`Dias sem comprar: ${c.dias}`);
@@ -1479,12 +1526,16 @@
       const s = STATUS_BY_KEY[c.statusKey] || STATUS_FALLBACK;
       const diasN = diasNumber(c.dias);
       const extras = [c.vendedor, diasN != null ? `${diasN.toLocaleString('pt-BR')} dias sem comprar` : null].filter(Boolean).join(' · ');
+      const tagBadge = hasTag(c.tags)
+        ? `<span class="badge" style="background:${hexToRgba('#8a4a7a',0.14)};color:#8a4a7a;align-self:flex-start;margin-top:1px">${c.tags}</span>`
+        : '';
       return `
         <div class="popupClientRow">
           <span class="badge" style="background:${hexToRgba(s.color,0.14)};color:${s.color}"><span class="dot" style="background:${s.color}"></span>${s.label}</span>
           <div class="popupClientInfo">
             <b>${c.razao || c.nome || '(sem nome)'}</b>
             <span class="mono">${c.cnpj || 'CNPJ não informado'}</span>
+            ${tagBadge}
             ${extras ? `<span class="popupClientExtra">${extras}</span>` : ''}
           </div>
           <button type="button" class="popupCopyBtn" onclick="__copyClientById(${c.id}, this)">Copiar</button>
@@ -1558,7 +1609,7 @@
 
   function setupResultsTableHead(){
     resultsTableHeadRow.innerHTML = clientsLoaded
-      ? `<th class="chkCol"><input type="checkbox" id="selectAllChk" title="Marcar/desmarcar todos os clientes visíveis"></th><th style="width:32px">#</th><th data-key="nome">Cliente</th><th data-key="cnpj">CNPJ</th><th data-key="cidade">Cidade</th><th data-key="situacao">Situação</th><th data-key="vendedor">Representante</th><th data-key="grupo">Grupo/Rede</th><th data-key="pendencia">Pendência</th><th data-key="dias" class="num">Dias sem comprar</th><th data-key="circulo">Círculo</th><th data-key="distancia" class="num">Distância</th><th class="actionCol">Ação</th>`
+      ? `<th class="chkCol"><input type="checkbox" id="selectAllChk" title="Marcar/desmarcar todos os clientes visíveis"></th><th style="width:32px">#</th><th data-key="nome">Cliente</th><th data-key="cnpj">CNPJ</th><th data-key="cidade">Cidade</th><th data-key="situacao">Situação</th><th data-key="vendedor">Representante</th><th data-key="grupo">Grupo/Rede</th><th data-key="pendencia">Pendência</th><th data-key="tags">Tags de cliente</th><th data-key="dias" class="num">Dias sem comprar</th><th data-key="circulo">Círculo</th><th data-key="distancia" class="num">Distância</th><th class="actionCol">Ação</th>`
       : `<th style="width:32px">#</th><th data-key="municipio">Município</th><th data-key="circulo">Círculo</th><th data-key="distancia" class="num">Distância</th>`;
     sortState = { key: null, dir: 1 };
     updateSortArrows();
@@ -1594,6 +1645,7 @@
     vendedor: { get: r => r.client.vendedor },
     grupo: { get: r => r.client.grupo },
     pendencia: { get: r => r.client.devedores },
+    tags: { get: r => r.client.tags },
     dias: { get: r => diasNumber(r.client.dias) },
     circulo: { get: r => r.bestCircleId },
     distancia: { get: r => r.bestD },
@@ -2389,6 +2441,9 @@
           : `<span style="color:var(--muted)">—</span>`;
         const diasN = diasNumber(c.dias);
         const diasCell = diasN != null ? `${diasN.toLocaleString('pt-BR')} dias` : (c.dias || '<span style="color:var(--muted)">—</span>');
+        const tagCell = hasTag(c.tags)
+          ? `<span class="badge" style="background:${hexToRgba('#8a4a7a',0.14)};color:#8a4a7a">${c.tags}</span>`
+          : `<span style="color:var(--muted)">—</span>`;
         const checked = selectedClientIds.has(c.id) ? ' checked' : '';
         return `
         <tr onclick="__focusLatLon(${c.lat}, ${c.lon})">
@@ -2401,6 +2456,7 @@
           <td>${c.vendedor || ''}</td>
           <td>${c.grupo || ''}</td>
           <td>${pendenciaCell}</td>
+          <td>${tagCell}</td>
           <td class="mono">${diasCell}</td>
           <td class="circleCol"><span class="dot" style="background:${r.bestColor}"></span>${circleTxt}</td>
           <td class="dist">${fmt(r.bestD)} km</td>
