@@ -311,6 +311,10 @@
      (que é o que o clique no resto da linha continua fazendo). */
   td.clientNameCell.clickable{ cursor:pointer; color:var(--accent); text-decoration:underline; text-decoration-color:var(--accent-soft); text-underline-offset:2px; }
   td.clientNameCell.clickable:hover{ text-decoration-color:var(--accent); }
+  /* CNPJ na tabela abre o cliente no Mercos (nova aba) quando clicado — mesmo tratamento
+     visual do nome clicável, mantendo a fonte monoespaçada já usada em "td.mono". */
+  td.clientCnpjCell.clickable{ cursor:pointer; color:var(--accent); text-decoration:underline; text-decoration-color:var(--accent-soft); text-underline-offset:2px; }
+  td.clientCnpjCell.clickable:hover{ text-decoration-color:var(--accent); }
 
   .orderModalOverlay{
     position:fixed; inset:0; background:rgba(10,14,11,0.45); z-index:900;
@@ -683,6 +687,7 @@
     <p><strong>Buscar cliente:</strong> logo abaixo do resumo da planilha carregada tem um campo para buscar por nome ou CNPJ (com ou sem pontuação) — ele procura na carteira inteira, sem depender dos filtros ou de já existir um círculo, e ao clicar num resultado o mapa vai até a cidade desse cliente e mostra um marcador destacado em dourado com o nome e o CNPJ no popup. A tabela de clientes encontrados (dentro dos círculos) também ganhou uma coluna de CNPJ, já que é por ela que você costuma procurar o cliente.</p>
     <p><strong>Histórico de pedidos:</strong> logo abaixo da planilha de clientes tem um segundo upload, opcional, para a planilha de controle de pedidos (com as abas COMERCIAL e B.D. CLIENTES) — ela cruza os pedidos com cada cliente pelo CNPJ, contando só pedidos com "CONTABILIZAR?" = SIM e somando o valor de "ENTRADA R$". Com ela carregada, a tabela ganha as colunas "Pedidos" e "Valor pedidos", e clicar em cima do NOME do cliente (na tabela) abre um resumo com o total de pedidos, valor total, ticket médio, data do pedido mais recente e a lista de pedidos individuais (data, status e valor) daquele cliente — sem mudar o clique no resto da linha, que continua levando até ele no mapa.</p>
     <p><strong>Cliente importante sumindo:</strong> com a planilha de pedidos carregada, a ferramenta cruza o valor histórico de cada cliente com os dias sem comprar da planilha de clientes, pra achar quem já foi um bom cliente e parou — algo que a lista comum de inativos não mostra, porque ali um cliente de R$ 500 e um de R$ 300 mil aparecem exatamente iguais. Entram nessa marcação os clientes com 60 dias ou mais sem comprar E com valor total no histórico de pedidos entre os 25% mais altos de toda a carteira carregada (não é um valor fixo em reais — se ajusta ao tamanho da própria planilha). Esses clientes ganham um ⚠ do lado do nome e a linha fica com um leve destaque na tabela, também aparecem marcados no popup do mapa e no resumo de pedidos (ao clicar no nome); tem também um filtro "Cliente importante sumindo", ao lado dos outros filtros extras, pra ver só eles.</p>
+    <p><strong>Abrir cliente no Mercos:</strong> na tabela de clientes encontrados, clicar em cima do CNPJ (não do nome) abre uma nova aba direto no cadastro desse cliente no Mercos, já com o CNPJ preenchido na busca — sem precisar copiar e colar em lugar nenhum. Clicar no nome continua abrindo o resumo de pedidos, e clicar no resto da linha continua levando até o cliente no mapa; cada parte da linha tem sua própria ação.</p>
     <p><strong>Fontes:</strong> coordenadas dos municípios via IBGE; mapa e ruas © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">colaboradores do OpenStreetMap</a>. Precisa de internet para carregar as imagens do mapa e para ler a planilha (a leitura em si acontece só no seu navegador — o arquivo não é enviado a lugar nenhum).</p>
   </footer>
 </div>
@@ -1270,6 +1275,15 @@
   orderModalCloseBtn.addEventListener('click', closeOrderSummaryModal);
   orderModalOverlay.addEventListener('click', (e) => { if (e.target === orderModalOverlay) closeOrderSummaryModal(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !orderModalOverlay.hidden) closeOrderSummaryModal(); });
+
+  // Clicar no CNPJ (na tabela de clientes encontrados) abre o cadastro desse cliente no
+  // Mercos numa aba nova — só troca a "/" do CNPJ por "%2F" (o resto do texto, com pontos
+  // e traço, entra igual); encodeURIComponent já faz exatamente isso.
+  const MERCOS_BASE_URL = 'https://app.mercos.com/371047/clientes/?nome=';
+  window.__openMercosClient = function(cnpj){
+    if (!cnpj) return;
+    window.open(MERCOS_BASE_URL + encodeURIComponent(String(cnpj).trim()), '_blank', 'noopener');
+  };
 
   // Aplica (ou limpa) os totais de pedidos em cada cliente já carregado, casando pelo
   // CNPJ. Roda de novo sempre que a planilha de clientes ou a de pedidos muda, pra que
@@ -2906,12 +2920,15 @@
           : ` class="city"`;
         const isVip = isVipSumindo(c);
         const vipBadge = isVip ? `<span class="vipBadge" title="Valor alto no histórico de pedidos e ${VIP_DIAS_THRESHOLD}+ dias sem comprar">⚠</span>` : '';
+        const cnpjCellAttrs = c.cnpj
+          ? ` class="mono clientCnpjCell clickable" onclick="event.stopPropagation(); __openMercosClient('${String(c.cnpj).replace(/'/g,"\\'")}')" title="Abrir esse cliente no Mercos (nova aba)"`
+          : ` class="mono"`;
         return `
         <tr class="${isVip ? 'vipRow' : ''}" onclick="__focusLatLon(${c.lat}, ${c.lon})">
           <td class="chkCol" onclick="event.stopPropagation()"><input type="checkbox"${checked} onchange="__toggleClientSelect(${c.id}, this.checked)"></td>
           <td class="rank">${i+1}</td>
           <td${nomeCellAttrs}>${vipBadge}${c.nome || ''}</td>
-          <td class="mono">${c.cnpj || ''}</td>
+          <td${cnpjCellAttrs}>${c.cnpj || ''}</td>
           <td class="city">${c.cidade || ''}<span class="uf">${c.uf || ''}</span></td>
           <td><span class="badge" style="background:${hexToRgba(st.color,0.14)};color:${st.color}"><span class="dot" style="background:${st.color}"></span>${st.label}</span></td>
           <td>${c.vendedor || ''}</td>
