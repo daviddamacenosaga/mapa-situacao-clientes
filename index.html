@@ -91,6 +91,11 @@
     border:1px solid var(--border); border-radius:9px; padding:7px 10px; max-width:280px;
   }
   .vendorFilterRow select:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  .vendorFilterRow input[type="date"]{
+    font:500 13px "IBM Plex Mono", monospace; color:var(--text); background:var(--surface-2);
+    border:1px solid var(--border); border-radius:9px; padding:6px 9px; color-scheme:light dark;
+  }
+  .vendorFilterRow input[type="date"]:focus{ outline:2px solid var(--accent); outline-offset:1px; }
 
   .ufFilterGroup{ margin-top:14px; }
   .ufFilterBar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
@@ -450,6 +455,16 @@
       </div>
     </div>
     <p class="clientStatusMsg" id="ordersStatusMsg"></p>
+    <div class="vendorFilterRow" id="ordersFilterRow" hidden>
+      <label for="ordersVendedorFilter" title="Representante que consta em cada pedido, na planilha de pedidos — pode ser diferente do 'Vendedor do último pedido' da planilha de clientes">Representante do pedido</label>
+      <select id="ordersVendedorFilter"></select>
+      <label for="ordersDateStart">Pedidos de</label>
+      <input type="date" id="ordersDateStart">
+      <label for="ordersDateEnd">até</label>
+      <input type="date" id="ordersDateEnd">
+      <button type="button" class="clearBtn" id="ordersFilterClearBtn">Limpar período</button>
+    </div>
+    <span id="ordersFilterOriginAnchor" hidden></span>
     <div class="clientSearchRow" id="clientSearchRow" hidden>
       <label for="clientSearchInput">Buscar cliente por nome ou CNPJ (localiza no mapa)</label>
       <div class="clientSearchWrap">
@@ -690,6 +705,7 @@
     <p><strong>Histórico de pedidos:</strong> logo abaixo da planilha de clientes tem um segundo upload, opcional, para a planilha de controle de pedidos (com as abas COMERCIAL e B.D. CLIENTES) — ela cruza os pedidos com cada cliente pelo CNPJ, contando só pedidos com "CONTABILIZAR?" = SIM e somando o valor de "ENTRADA R$". Com ela carregada, a tabela ganha as colunas "Pedidos" e "Valor pedidos", e clicar em cima do NOME do cliente (na tabela) abre um resumo com o total de pedidos, valor total, ticket médio, data do pedido mais recente e a lista de pedidos individuais (data, status e valor) daquele cliente — sem mudar o clique no resto da linha, que continua levando até ele no mapa.</p>
     <p><strong>Cliente importante sumindo:</strong> com a planilha de pedidos carregada, a ferramenta cruza o valor histórico de cada cliente com os dias sem comprar da planilha de clientes, pra achar quem já foi um bom cliente e parou — algo que a lista comum de inativos não mostra, porque ali um cliente de R$ 500 e um de R$ 300 mil aparecem exatamente iguais. Entram nessa marcação os clientes com 60 dias ou mais sem comprar E com valor total no histórico de pedidos entre os 25% mais altos de toda a carteira carregada (não é um valor fixo em reais — se ajusta ao tamanho da própria planilha). Esses clientes ganham um ⚠ do lado do nome e a linha fica com um leve destaque na tabela, também aparecem marcados no popup do mapa e no resumo de pedidos (ao clicar no nome); tem também um filtro "Cliente importante sumindo", ao lado dos outros filtros extras, pra ver só eles.</p>
     <p><strong>Abrir cliente no Mercos:</strong> na tabela de clientes encontrados, clicar em cima do CNPJ (não do nome) abre uma nova aba direto no cadastro desse cliente no Mercos, já com o CNPJ preenchido na busca — sem precisar copiar e colar em lugar nenhum. Clicar no nome continua abrindo o resumo de pedidos, e clicar no resto da linha continua levando até o cliente no mapa; cada parte da linha tem sua própria ação.</p>
+    <p><strong>Filtrar pedidos por representante e período:</strong> com a planilha de pedidos carregada aparece o filtro "Representante do pedido", com dois campos de data ("Pedidos de... até..."). Atenção: esse representante vem da coluna VENDEDOR de cada linha da planilha de pedidos — é o representante daquele pedido específico, o que pode ser diferente do filtro "Representante" de cima (que é só o "Vendedor do último pedido" salvo no cadastro do cliente). Escolhendo um representante e/ou um período aqui, a ferramenta passa a mostrar só os clientes que tiveram pelo menos um pedido daquele representante dentro do intervalo escolhido — ótimo pra ver no mapa onde alguém atuou numa janela de tempo específica. As colunas "Pedidos" e "Valor pedidos" (na tabela, no popup do mapa e no texto copiado) passam a contar só os pedidos daquele recorte, com "(filtrado)" no cabeçalho da tabela pra deixar isso claro; o alerta "Cliente importante sumindo" e o resumo completo de pedidos (ao clicar no nome do cliente) continuam sempre olhando pro histórico inteiro, de propósito. O botão "Limpar período" volta a mostrar tudo.</p>
     <p><strong>Fontes:</strong> coordenadas dos municípios via IBGE; mapa e ruas © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">colaboradores do OpenStreetMap</a>. Precisa de internet para carregar as imagens do mapa e para ler a planilha (a leitura em si acontece só no seu navegador — o arquivo não é enviado a lugar nenhum).</p>
   </footer>
 </div>
@@ -803,6 +819,12 @@
   const ordersFile = document.getElementById('ordersFile');
   const removeOrdersBtn = document.getElementById('removeOrdersBtn');
   const ordersStatusMsg = document.getElementById('ordersStatusMsg');
+  const ordersFilterRow = document.getElementById('ordersFilterRow');
+  const ordersFilterOriginAnchor = document.getElementById('ordersFilterOriginAnchor');
+  const ordersVendedorFilterSel = document.getElementById('ordersVendedorFilter');
+  const ordersDateStartInput = document.getElementById('ordersDateStart');
+  const ordersDateEndInput = document.getElementById('ordersDateEnd');
+  const ordersFilterClearBtn = document.getElementById('ordersFilterClearBtn');
   const orderModalOverlay = document.getElementById('orderModalOverlay');
   const orderModalTitle = document.getElementById('orderModalTitle');
   const orderModalCnpj = document.getElementById('orderModalCnpj');
@@ -890,6 +912,7 @@
       mapFullscreenFilters.hidden = false;
       mapFullscreenFilters.appendChild(statusFiltersEl);
       mapFullscreenFilters.appendChild(vendorFilterRow);
+      mapFullscreenFilters.appendChild(ordersFilterRow);
       mapFullscreenFilters.appendChild(ufFilterGroup);
       mapFullscreenFilters.appendChild(extraFiltersRow);
       // toda vez que entra em tela cheia, começa "limpo" (filtros/detalhes ocultos) pra
@@ -898,6 +921,10 @@
       setChromeHidden(true);
     } else {
       mapFullscreenFilters.hidden = true;
+      // ordersFilterRow tem seu próprio "ponto de origem" (fica bem acima dos outros na
+      // página normal, logo abaixo do status da planilha de pedidos) — volta pra lá, não
+      // pro mesmo ponto dos outros filtros, senão ela pularia de lugar após o 1º uso da tela cheia.
+      ordersFilterOriginAnchor.parentNode.insertBefore(ordersFilterRow, ordersFilterOriginAnchor);
       filtersOriginAnchor.parentNode.insertBefore(statusFiltersEl, filtersOriginAnchor);
       filtersOriginAnchor.parentNode.insertBefore(vendorFilterRow, filtersOriginAnchor);
       filtersOriginAnchor.parentNode.insertBefore(ufFilterGroup, filtersOriginAnchor);
@@ -1108,6 +1135,18 @@
   let ordersUnmatchedCount = 0; // pedidos válidos cujo código não bateu com nenhuma linha da B.D. CLIENTES
   let ordersNoCnpjCount = 0; // código bateu na B.D. CLIENTES, mas sem CNPJ preenchido
 
+  // Filtro por "Representante do pedido" (coluna VENDEDOR de cada linha em COMERCIAL — um
+  // dado por PEDIDO, diferente do "Vendedor do último pedido" que já existe na planilha de
+  // clientes) + período (DATA ENTRADA). Serve pra responder "onde o Fulano atuou entre tal e
+  // tal data": restringe os clientes mostrados a quem teve pelo menos um pedido batendo
+  // nesse representante/intervalo, e os totais de Pedidos/Valor pedidos passam a refletir só
+  // esse recorte. Não muda "cliente importante sumindo" nem o resumo do modal — os dois
+  // continuam olhando pro histórico completo de propósito.
+  let orderVendedores = []; // representantes distintos vindos da coluna VENDEDOR dos pedidos válidos
+  let ordersFilterVendedor = ''; // '' = todos os representantes
+  let ordersFilterStart = null; // Date (meia-noite local) ou null = sem início definido
+  let ordersFilterEnd = null; // Date (meia-noite local) ou null = sem fim definido
+
   function normalizeCnpj(v){
     if (v === null || v === undefined) return '';
     return String(v).replace(/\D/g, '');
@@ -1195,6 +1234,7 @@
     const iStatus = com.idx['STATUS'];
     const iVendedor = com.idx['VENDEDOR'];
     const byCnpj = new Map();
+    const vendedorSet = new Set();
     let validOrders = 0, unmatched = 0, noCnpj = 0;
     for (let r = com.headerIdx + 1; r < com.rows.length; r++){
       const row = com.rows[r];
@@ -1211,6 +1251,7 @@
       const date = iData !== undefined ? parseOrderDate(row[iData]) : null;
       const status = (iStatus !== undefined && row[iStatus]) ? String(row[iStatus]).trim() : '';
       const vendedor = (iVendedor !== undefined && row[iVendedor]) ? String(row[iVendedor]).trim() : '';
+      if (vendedor) vendedorSet.add(vendedor);
       validOrders++;
       let agg = byCnpj.get(cnpjKey);
       if (!agg){ agg = { count: 0, total: 0, orders: [] }; byCnpj.set(cnpjKey, agg); }
@@ -1227,7 +1268,8 @@
         return 0;
       });
     });
-    return { byCnpj, validOrders, unmatched, noCnpj };
+    const vendedores = Array.from(vendedorSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    return { byCnpj, validOrders, unmatched, noCnpj, vendedores };
   }
 
   // --- Resumo de pedidos de um cliente (modal) ---------------------------------------
@@ -1305,6 +1347,129 @@
     });
   }
 
+  // Converte o valor de um <input type="date"> ("AAAA-MM-DD") num Date à meia-noite local,
+  // do mesmo jeito que parseOrderDate() já faz pros pedidos — um `new Date("AAAA-MM-DD")` puro
+  // interpretaria como meia-noite UTC, o que pode virar o dia errado dependendo do fuso.
+  function parseDateInputValue(v){
+    if (!v) return null;
+    const m = String(v).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    const d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function dateToInputValue(d){
+    if (!d) return '';
+    const yy = d.getFullYear(), mm = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
+  }
+
+  function hasOrdersPeriodFilter(){
+    return !!(ordersFilterVendedor || ordersFilterStart || ordersFilterEnd);
+  }
+
+  // Um pedido individual bate no filtro quando: (a) não há representante escolhido, ou o
+  // pedido é desse representante; e (b) a data do pedido, quando existe, cai dentro do
+  // intervalo escolhido. Um pedido sem data conhecida só entra quando não há filtro de data
+  // (não dá pra saber se ele cairia dentro do período ou não).
+  function orderMatchesFilters(o){
+    if (ordersFilterVendedor && o.vendedor !== ordersFilterVendedor) return false;
+    if (ordersFilterStart || ordersFilterEnd){
+      if (!o.date) return false;
+      if (ordersFilterStart && o.date < ordersFilterStart) return false;
+      if (ordersFilterEnd && o.date > ordersFilterEnd) return false;
+    }
+    return true;
+  }
+
+  // Pedidos de um cliente que batem no filtro de representante/período atual — ou todos os
+  // pedidos dele, quando não há filtro ativo.
+  function getClientPeriodOrders(c){
+    const key = normalizeCnpj(c.cnpj);
+    const agg = key ? orderStatsByCnpj.get(key) : null;
+    if (!agg) return [];
+    if (!hasOrdersPeriodFilter()) return agg.orders;
+    return agg.orders.filter(orderMatchesFilters);
+  }
+
+  // Pedidos/valor mostrados na tabela, no popup do mapa, no texto de copiar e no .csv:
+  // refletem o filtro de representante/período quando ele está ativo; sem filtro, continuam
+  // sendo os totais de sempre (todo o histórico da planilha de pedidos).
+  function getDisplayedPedidos(c){
+    if (!ordersLoaded || c.pedidosCount == null) return { count: null, total: null };
+    if (!hasOrdersPeriodFilter()) return { count: c.pedidosCount, total: c.pedidosValor };
+    const orders = getClientPeriodOrders(c);
+    const total = orders.reduce((s, o) => s + o.valor, 0);
+    return { count: orders.length, total };
+  }
+
+  // Com o filtro de representante/período ativo, só mantém na lista/mapa quem teve pelo
+  // menos um pedido batendo nele — é o que permite ver no mapa só onde aquele representante
+  // atuou naquele intervalo. Sem filtro ativo, não restringe nada (comportamento de sempre).
+  function clientMatchesOrdersFilter(c){
+    if (!ordersLoaded || !hasOrdersPeriodFilter()) return true;
+    return getClientPeriodOrders(c).length > 0;
+  }
+
+  // Cabeçalho das colunas "Pedidos"/"Valor pedidos" ganha um aviso "(filtrado)" quando o
+  // filtro de representante/período está ativo, pra deixar claro que esses números não são
+  // mais o histórico inteiro.
+  function updateOrdersColumnHeaderLabels(){
+    const thPedidos = resultsTableHeadRow.querySelector('th[data-key="pedidos"]');
+    const thValor = resultsTableHeadRow.querySelector('th[data-key="valorPedidos"]');
+    if (!thPedidos || !thValor) return;
+    const active = hasOrdersPeriodFilter();
+    const suffix = active ? ' (filtrado)' : '';
+    const title = active
+      ? 'Contando só os pedidos que batem no filtro "Representante do pedido" / período escolhido acima. Sem esse filtro, mostra o histórico completo de sempre.'
+      : '';
+    thPedidos.dataset.label = 'Pedidos' + suffix;
+    thValor.dataset.label = 'Valor pedidos' + suffix;
+    thPedidos.title = title;
+    thValor.title = title;
+    updateSortArrows();
+  }
+
+  // Preenche/mostra o filtro "Representante do pedido" + período (só existe quando a
+  // planilha de pedidos está carregada e tem pelo menos um representante identificado nela).
+  function renderOrdersFilterRow(){
+    if (!ordersLoaded || !orderVendedores.length){
+      ordersFilterRow.hidden = true;
+      return;
+    }
+    ordersFilterRow.hidden = false;
+    ordersVendedorFilterSel.innerHTML = ['<option value="">Todos os representantes</option>']
+      .concat(orderVendedores.map(n => `<option value="${n.replace(/"/g,'&quot;')}">${n}</option>`)).join('');
+    ordersVendedorFilterSel.value = ordersFilterVendedor;
+    ordersDateStartInput.value = dateToInputValue(ordersFilterStart);
+    ordersDateEndInput.value = dateToInputValue(ordersFilterEnd);
+  }
+
+  function applyOrdersFilterChange(){
+    updateOrdersColumnHeaderLabels();
+    recompute();
+    renderCitiesTab();
+    renderRepTab();
+  }
+  ordersVendedorFilterSel.addEventListener('change', () => {
+    ordersFilterVendedor = ordersVendedorFilterSel.value;
+    applyOrdersFilterChange();
+  });
+  ordersDateStartInput.addEventListener('change', () => {
+    ordersFilterStart = parseDateInputValue(ordersDateStartInput.value);
+    applyOrdersFilterChange();
+  });
+  ordersDateEndInput.addEventListener('change', () => {
+    ordersFilterEnd = parseDateInputValue(ordersDateEndInput.value);
+    applyOrdersFilterChange();
+  });
+  ordersFilterClearBtn.addEventListener('click', () => {
+    ordersFilterVendedor = '';
+    ordersFilterStart = null;
+    ordersFilterEnd = null;
+    renderOrdersFilterRow();
+    applyOrdersFilterChange();
+  });
+
   ordersFile.addEventListener('change', () => {
     const file = ordersFile.files && ordersFile.files[0];
     if (file) loadOrdersFile(file);
@@ -1341,6 +1506,10 @@
     orderStatsByCnpj = parsed.byCnpj;
     ordersUnmatchedCount = parsed.unmatched;
     ordersNoCnpjCount = parsed.noCnpj;
+    orderVendedores = parsed.vendedores;
+    ordersFilterVendedor = '';
+    ordersFilterStart = null;
+    ordersFilterEnd = null;
     ordersLoaded = true;
     ordersFileNameLoaded = fileName;
     removeOrdersBtn.hidden = false;
@@ -1352,8 +1521,10 @@
     ordersStatusMsg.textContent = parts.join(' ');
     renderClientSummary();
     renderExtraFilters();
+    renderOrdersFilterRow();
     refreshExportInfo();
     setupResultsTableHead();
+    updateOrdersColumnHeaderLabels();
     recompute();
     renderCitiesTab();
     renderRepTab();
@@ -1366,6 +1537,10 @@
     ordersNoCnpjCount = 0;
     ordersFileNameLoaded = '';
     ordersFile.value = '';
+    orderVendedores = [];
+    ordersFilterVendedor = '';
+    ordersFilterStart = null;
+    ordersFilterEnd = null;
     removeOrdersBtn.hidden = true;
     ordersStatusMsg.textContent = '';
     ordersStatusMsg.classList.remove('bad');
@@ -1374,8 +1549,10 @@
     applyOrderStatsToClients();
     renderClientSummary();
     renderExtraFilters();
+    renderOrdersFilterRow();
     refreshExportInfo();
     setupResultsTableHead();
+    updateOrdersColumnHeaderLabels();
     recompute();
     renderCitiesTab();
     renderRepTab();
@@ -1493,6 +1670,9 @@
     filterNoTag = false;
     filterDiasFaixa = false;
     filterOnlyVip = false;
+    ordersFilterVendedor = '';
+    ordersFilterStart = null;
+    ordersFilterEnd = null;
     selectedClientIds = new Set();
     copySelectedBtn.hidden = false;
     updateCopySelectedBtn();
@@ -1517,10 +1697,12 @@
     renderVendorFilter();
     renderUFFilters();
     renderExtraFilters();
+    renderOrdersFilterRow();
     renderMapLegend();
     mapCountToggleRow.hidden = false;
     heatmapToggleRow.hidden = !heatLayer;
     setupResultsTableHead();
+    updateOrdersColumnHeaderLabels();
     circles = [];
     recompute();
     renderCitiesTab();
@@ -1575,11 +1757,17 @@
     removeOrdersBtn.hidden = true;
     ordersStatusMsg.textContent = '';
     ordersStatusMsg.classList.remove('bad');
+    orderVendedores = [];
+    ordersFilterVendedor = '';
+    ordersFilterStart = null;
+    ordersFilterEnd = null;
+    ordersFilterRow.hidden = true;
     downloadBtnLabel.textContent = 'Baixar .txt';
     downloadBtn.title = 'Salvar em .txt, no formato Cidade-Estado';
     exportInfo.innerHTML = '<strong>Exportação:</strong> o .txt sai no formato "Cidade-Estado" em cada linha (ex.: Porto Alegre-RS) — pensado justamente para quando os círculos caem em estados diferentes, e para ser fácil de cortar o "-UF" no final se um dia precisar só do nome da cidade.';
     switchTab('mapa');
     setupResultsTableHead();
+    updateOrdersColumnHeaderLabels();
     recompute();
     renderCitiesTab();
     renderRepTab();
@@ -1748,7 +1936,8 @@
       (!filterOnlyTag || hasTag(r.tags)) &&
       (!filterNoTag || !hasTag(r.tags)) &&
       (!filterDiasFaixa || isQuaseInativoDias(r.dias)) &&
-      (!filterOnlyVip || isVipSumindo(r))
+      (!filterOnlyVip || isVipSumindo(r)) &&
+      clientMatchesOrdersFilter(r)
     );
   }
 
@@ -1886,8 +2075,10 @@
     if (valorN != null) lines.push(`Valor do último pedido: ${valorN.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
     else if (c.valorUltimo) lines.push(`Valor do último pedido: ${c.valorUltimo}`);
     if (ordersLoaded && c.pedidosCount != null){
-      const valTxt = (c.pedidosValor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      lines.push(`Pedidos (planilha de pedidos): ${c.pedidosCount.toLocaleString('pt-BR')} (total ${valTxt})`);
+      const dispCopy = getDisplayedPedidos(c);
+      const valTxt = (dispCopy.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      const label = hasOrdersPeriodFilter() ? 'Pedidos no filtro aplicado' : 'Pedidos (planilha de pedidos)';
+      lines.push(`${label}: ${dispCopy.count.toLocaleString('pt-BR')} (total ${valTxt})`);
     }
     if (isPendenciaAtiva(c.devedores)) lines.push(`Pendência: ${c.devedores}`);
     if (c.telefone) lines.push(`Telefone: ${c.telefone}`);
@@ -1983,8 +2174,9 @@
     const rows = shown.map(c => {
       const s = STATUS_BY_KEY[c.statusKey] || STATUS_FALLBACK;
       const diasN = diasNumber(c.dias);
-      const pedidosTxt = (ordersLoaded && c.pedidosCount != null)
-        ? `${c.pedidosCount.toLocaleString('pt-BR')} pedido(s)${c.pedidosCount ? ' · ' + (c.pedidosValor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : ''}`
+      const dispPop = (ordersLoaded && c.pedidosCount != null) ? getDisplayedPedidos(c) : null;
+      const pedidosTxt = dispPop
+        ? `${dispPop.count.toLocaleString('pt-BR')} pedido(s)${hasOrdersPeriodFilter() ? ' (filtro aplicado)' : ''}${dispPop.count ? ' · ' + (dispPop.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : ''}`
         : null;
       const extras = [c.vendedor, diasN != null ? `${diasN.toLocaleString('pt-BR')} dias sem comprar` : null, pedidosTxt].filter(Boolean).join(' · ');
       const tagBadge = hasTag(c.tags)
@@ -2115,8 +2307,8 @@
     pendencia: { get: r => r.client.devedores },
     tags: { get: r => r.client.tags },
     dias: { get: r => diasNumber(r.client.dias) },
-    pedidos: { get: r => r.client.pedidosCount },
-    valorPedidos: { get: r => r.client.pedidosValor },
+    pedidos: { get: r => getDisplayedPedidos(r.client).count },
+    valorPedidos: { get: r => getDisplayedPedidos(r.client).total },
     circulo: { get: r => r.bestCircleId },
     distancia: { get: r => r.bestD },
   };
@@ -2915,8 +3107,9 @@
           ? `<span class="badge" style="background:${hexToRgba('#8a4a7a',0.14)};color:#8a4a7a">${c.tags}</span>`
           : `<span style="color:var(--muted)">—</span>`;
         const checked = selectedClientIds.has(c.id) ? ' checked' : '';
+        const disp = ordersLoaded ? getDisplayedPedidos(c) : { count: null, total: null };
         const ordersCells = ordersLoaded
-          ? `<td class="mono">${c.pedidosCount != null ? c.pedidosCount.toLocaleString('pt-BR') : '<span style="color:var(--muted)">—</span>'}</td><td class="mono">${c.pedidosValor != null ? c.pedidosValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '<span style="color:var(--muted)">—</span>'}</td>`
+          ? `<td class="mono">${disp.count != null ? disp.count.toLocaleString('pt-BR') : '<span style="color:var(--muted)">—</span>'}</td><td class="mono">${disp.total != null ? disp.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '<span style="color:var(--muted)">—</span>'}</td>`
           : '';
         const nomeCellAttrs = ordersLoaded
           ? ` class="city clientNameCell clickable" onclick="event.stopPropagation(); __showOrderSummary(${c.id})" title="Ver resumo dos pedidos deste cliente"`
@@ -2971,13 +3164,18 @@
       // plus the columns this ferramenta calcula (pedidos/valor, quando a planilha de
       // pedidos está carregada, e sempre círculo e distância)
       const fileHeaders = clientRawHeaders.length ? clientRawHeaders : ['Nome','Cidade','Estado','Situação'];
-      const header = fileHeaders.concat(ordersLoaded ? ['Pedidos', 'Valor pedidos', 'Círculo', 'Distância (km)'] : ['Círculo', 'Distância (km)']);
+      const pedidosColLabel = hasOrdersPeriodFilter() ? 'Pedidos (filtro aplicado)' : 'Pedidos';
+      const valorPedidosColLabel = hasOrdersPeriodFilter() ? 'Valor pedidos (filtro aplicado)' : 'Valor pedidos';
+      const header = fileHeaders.concat(ordersLoaded ? [pedidosColLabel, valorPedidosColLabel, 'Círculo', 'Distância (km)'] : ['Círculo', 'Distância (km)']);
       const lines = [header.join(';')];
       for (const r of lastRenderedRows){
         const c = r.client;
         const circleTxt = r.circleIds.size > 1 ? Array.from(r.circleIds).sort((a,b)=>a-b).join(',') : String(r.bestCircleId);
         const vals = fileHeaders.map(h => (c.raw && c.raw[h] != null) ? c.raw[h] : '');
-        if (ordersLoaded) vals.push(c.pedidosCount != null ? c.pedidosCount : '', c.pedidosValor != null ? String(c.pedidosValor).replace('.', ',') : '');
+        if (ordersLoaded){
+          const disp = getDisplayedPedidos(c);
+          vals.push(disp.count != null ? disp.count : '', disp.total != null ? String(disp.total).replace('.', ',') : '');
+        }
         vals.push(circleTxt, fmt(r.bestD));
         lines.push(vals.map(v => String(v == null ? '' : v).replace(/;/g, ',').replace(/[\r\n]+/g, ' ')).join(';'));
       }
